@@ -23,7 +23,7 @@ const URLForm: React.FC<URLFormProps> = ({ onSubmit, isLoading }) => {
     const normalizedUrl = normalizeURL(url);
     
     if (!validateURL(normalizedUrl)) {
-      setError('Please enter a valid URL (e.g., google.com or https://google.com)');
+      setError('Please enter a valid HTTPS URL. HTTP URLs are not supported for security reasons.');
       return;
     }
 
