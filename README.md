@@ -30,5 +30,5 @@
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/yourusername/thalora.git
+   git clone https://github.com/gordonbeeming/thalora.git
    cd thalora
