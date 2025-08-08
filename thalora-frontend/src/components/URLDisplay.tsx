@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
 import './URLDisplay.css';
 
-const URLDisplay = ({ originalUrl, shortenedUrl, onCopySuccess }) => {
-  const [copied, setCopied] = useState(false);
+interface URLDisplayProps {
+  originalUrl: string;
+  shortenedUrl: string;
+  onCopySuccess?: () => void;
+}
+
+const URLDisplay: React.FC<URLDisplayProps> = ({ originalUrl, shortenedUrl, onCopySuccess }) => {
+  const [copied, setCopied] = useState<boolean>(false);
 
   const handleCopy = async () => {
     try {

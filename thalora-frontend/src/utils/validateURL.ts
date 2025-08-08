@@ -1,9 +1,7 @@
 /**
  * Validates if a URL is properly formatted
- * @param {string} url - The URL string to validate
- * @returns {boolean} - True if valid URL, false otherwise
  */
-export const validateURL = (url) => {
+export const validateURL = (url: string): boolean => {
   if (!url || typeof url !== 'string') {
     return false;
   }
@@ -27,10 +25,8 @@ export const validateURL = (url) => {
 
 /**
  * Normalizes a URL by adding protocol if missing
- * @param {string} url - The URL string to normalize
- * @returns {string} - Normalized URL with protocol
  */
-export const normalizeURL = (url) => {
+export const normalizeURL = (url: string): string => {
   if (!url || typeof url !== 'string') {
     return '';
   }

@@ -2,11 +2,16 @@ import React, { useState } from 'react';
 import { validateURL, normalizeURL } from '../utils/validateURL';
 import './URLForm.css';
 
-const URLForm = ({ onSubmit, isLoading }) => {
-  const [url, setUrl] = useState('');
-  const [error, setError] = useState('');
+interface URLFormProps {
+  onSubmit: (url: string) => void;
+  isLoading: boolean;
+}
 
-  const handleSubmit = (e) => {
+const URLForm: React.FC<URLFormProps> = ({ onSubmit, isLoading }) => {
+  const [url, setUrl] = useState<string>('');
+  const [error, setError] = useState<string>('');
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
 
@@ -25,7 +30,7 @@ const URLForm = ({ onSubmit, isLoading }) => {
     onSubmit(normalizedUrl);
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setUrl(value);
     if (error) {

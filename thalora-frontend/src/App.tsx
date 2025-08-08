@@ -2,12 +2,12 @@ import React from 'react';
 import Home from './pages/Home';
 import './styles/globals.css';
 
-function App() {
+const App: React.FC = () => {
   return (
     <div className="App">
       <Home />
     </div>
   );
-}
+};
 
 export default App;

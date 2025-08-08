@@ -5,19 +5,19 @@ import URLForm from '../components/URLForm';
 import URLDisplay from '../components/URLDisplay';
 import './Home.css';
 
-const Home = () => {
-  const [shortenedUrl, setShortenedUrl] = useState('');
-  const [originalUrl, setOriginalUrl] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+const Home: React.FC = () => {
+  const [shortenedUrl, setShortenedUrl] = useState<string>('');
+  const [originalUrl, setOriginalUrl] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Mock URL shortening function - in real app this would call backend API
-  const generateMockShortenedUrl = (url) => {
+  const generateMockShortenedUrl = (url: string): string => {
     // Generate a random short ID
     const shortId = Math.random().toString(36).substring(2, 8);
     return `https://thalora.co/${shortId}`;
   };
 
-  const handleUrlSubmit = async (url) => {
+  const handleUrlSubmit = async (url: string): Promise<void> => {
     setIsLoading(true);
     setOriginalUrl(url);
     
@@ -36,7 +36,7 @@ const Home = () => {
     }
   };
 
-  const handleCopySuccess = () => {
+  const handleCopySuccess = (): void => {
     // This could trigger analytics or show a toast notification
     console.log('URL copied to clipboard successfully');
   };
