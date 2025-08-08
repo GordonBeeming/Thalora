@@ -10,7 +10,7 @@ const Footer: React.FC = () => {
         <div className="footer__content">
           <div className="footer__info">
             <p className="footer__copyright">
-              © {currentYear} Thalora. Built with React.
+              &copy; {currentYear} Thalora. Built with React.
             </p>
             <p className="footer__description">
               A modern, secure, and customizable URL shortener designed for simplicity and performance.
