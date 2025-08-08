@@ -9,6 +9,9 @@ node_modules/
 # Production builds
 /build
 /dist
+# React build folders  
+thalora-frontend/build/
+*/build/
 
 # Environment variables
 .env
