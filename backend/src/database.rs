@@ -1,10 +1,10 @@
 use anyhow::Result;
+use bb8::Pool;
+use bb8_tiberius::ConnectionManager;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::env;
 use tiberius::Config;
-use bb8::Pool;
-use bb8_tiberius::ConnectionManager;
 
 pub type DatabasePool = Pool<ConnectionManager>;
 
@@ -29,13 +29,13 @@ impl DatabaseConfig {
     pub fn from_env() -> Result<Self> {
         let base_connection_string = env::var("DATABASE_URL")
             .map_err(|_| anyhow::anyhow!("DATABASE_URL environment variable not set"))?;
-        
+
         // Parse environment variables for pool configuration
         let max_connections = env::var("DB_MAX_CONNECTIONS")
             .ok()
             .and_then(|s| s.parse().ok())
             .unwrap_or(10);
-            
+
         let min_connections = env::var("DB_MIN_CONNECTIONS")
             .ok()
             .and_then(|s| s.parse().ok())
@@ -49,7 +49,8 @@ impl DatabaseConfig {
                 // Default: disable encryption for local development, enable for production
                 let is_production = env::var("ENVIRONMENT")
                     .unwrap_or_else(|_| "development".to_string())
-                    .to_lowercase() == "production";
+                    .to_lowercase()
+                    == "production";
                 is_production
             });
 
@@ -57,7 +58,10 @@ impl DatabaseConfig {
         let connection_string = if encryption_enabled {
             // Production: use encryption with certificate trust
             if !base_connection_string.contains("Encrypt=") {
-                format!("{};Encrypt=yes;TrustServerCertificate=true", base_connection_string)
+                format!(
+                    "{};Encrypt=yes;TrustServerCertificate=true",
+                    base_connection_string
+                )
             } else {
                 base_connection_string
             }
@@ -67,17 +71,25 @@ impl DatabaseConfig {
                 // Replace any existing Encrypt setting
                 let re = regex::Regex::new(r"Encrypt=[^;]*;?").unwrap();
                 let updated = re.replace_all(&base_connection_string, "");
-                format!("{};Encrypt=no;TrustServerCertificate=yes", updated.trim_end_matches(';'))
+                format!(
+                    "{};Encrypt=no;TrustServerCertificate=yes",
+                    updated.trim_end_matches(';')
+                )
             } else {
-                format!("{};Encrypt=no;TrustServerCertificate=yes", base_connection_string)
+                format!(
+                    "{};Encrypt=no;TrustServerCertificate=yes",
+                    base_connection_string
+                )
             }
         };
 
         info!("Database encryption enabled: {}", encryption_enabled);
         if !encryption_enabled {
-            warn!("Database encryption is DISABLED. This should only be used for local development.");
+            warn!(
+                "Database encryption is DISABLED. This should only be used for local development."
+            );
         }
-        
+
         Ok(DatabaseConfig {
             connection_string,
             max_connections,
@@ -88,15 +100,22 @@ impl DatabaseConfig {
 }
 
 pub async fn create_connection_pool(config: &DatabaseConfig) -> Result<DatabasePool> {
-    info!("Creating database connection pool with {}-{} connections...", config.min_connections, config.max_connections);
-    
+    info!(
+        "Creating database connection pool with {}-{} connections...",
+        config.min_connections, config.max_connections
+    );
+
     // Parse connection string for Tiberius
-    let tiberius_config = Config::from_ado_string(&config.connection_string)
-        .map_err(|e| anyhow::anyhow!("Invalid DATABASE_URL format: {}", e))?;
-    
-    // Create connection manager
+    let mut tiberius_config =
+        Config::from_ado_string(&config.connection_string) // <-- Make it mutable
+            .map_err(|e| anyhow::anyhow!("Invalid DATABASE_URL format: {}", e))?;
+    if !config.encryption_enabled {
+        tiberius_config.encryption(tiberius::EncryptionLevel::NotSupported);
+    }
+
+    // Create connection manager with the MODIFIED config
     let connection_manager = ConnectionManager::new(tiberius_config);
-    
+
     // Build the connection pool
     let pool = Pool::builder()
         .max_size(config.max_connections)
@@ -106,21 +125,25 @@ pub async fn create_connection_pool(config: &DatabaseConfig) -> Result<DatabaseP
         .map_err(|e| anyhow::anyhow!("Failed to create connection pool: {}", e))?;
 
     info!("Database connection pool created successfully");
-    
+
     // Test the pool with a simple query
     info!("Testing connection pool...");
     {
-        let mut conn = pool.get().await
+        let mut conn = pool
+            .get()
+            .await
             .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
-        
+
         let query = tiberius::Query::new("SELECT 1 as test");
-        let stream = query.query(&mut *conn).await
+        let stream = query
+            .query(&mut *conn)
+            .await
             .map_err(|e| anyhow::anyhow!("Database connection test failed: {}", e))?;
-        
+
         let _rows = stream.into_first_result().await?;
         info!("Connection pool test successful");
     } // conn is dropped here
-    
+
     Ok(pool)
 }
 
@@ -129,28 +152,30 @@ pub struct DatabaseService;
 impl DatabaseService {
     pub async fn initialize_database(pool: &DatabasePool) -> Result<()> {
         info!("Initializing database schema...");
-        
-        let mut conn = pool.get().await
+
+        let mut conn = pool
+            .get()
+            .await
             .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
-        
+
         // Check if TaloraDB database exists, create if not
         let db_check_query = "
             SELECT COUNT(*) as db_exists 
             FROM sys.databases 
             WHERE name = 'TaloraDB'
         ";
-        
+
         let query = tiberius::Query::new(db_check_query);
         let stream = query.query(&mut *conn).await?;
         let row = stream.into_first_result().await?;
-        
+
         let db_exists = if let Some(row) = row.into_iter().next() {
             let count: i32 = row.get(0).unwrap_or(0);
             count > 0
         } else {
             false
         };
-        
+
         if !db_exists {
             info!("Creating TaloraDB database...");
             let create_db_query = "CREATE DATABASE TaloraDB";
@@ -160,30 +185,30 @@ impl DatabaseService {
         } else {
             info!("TaloraDB database already exists");
         }
-        
+
         // Switch to TaloraDB database
         let use_db_query = "USE TaloraDB";
         let query = tiberius::Query::new(use_db_query);
         query.execute(&mut *conn).await?;
-        
+
         // Check if urls table exists, create if not
         let table_check_query = "
             SELECT COUNT(*) as table_exists 
             FROM INFORMATION_SCHEMA.TABLES 
             WHERE TABLE_NAME = 'urls'
         ";
-        
+
         let query = tiberius::Query::new(table_check_query);
         let stream = query.query(&mut *conn).await?;
         let row = stream.into_first_result().await?;
-        
+
         let table_exists = if let Some(row) = row.into_iter().next() {
             let count: i32 = row.get(0).unwrap_or(0);
             count > 0
         } else {
             false
         };
-        
+
         if !table_exists {
             info!("Creating urls table...");
             let create_table_query = "
@@ -204,15 +229,21 @@ impl DatabaseService {
         } else {
             info!("urls table already exists");
         }
-        
+
         info!("Database initialization completed");
         Ok(())
     }
 
-    pub async fn insert_url(pool: &DatabasePool, original_url: &str, shortened_url: &str) -> Result<i64> {
-        let mut conn = pool.get().await
+    pub async fn insert_url(
+        pool: &DatabasePool,
+        original_url: &str,
+        shortened_url: &str,
+    ) -> Result<i64> {
+        let mut conn = pool
+            .get()
+            .await
             .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
-            
+
         let query = "
             USE TaloraDB;
             INSERT INTO urls (original_url, shortened_url) 
@@ -226,7 +257,7 @@ impl DatabaseService {
 
         let stream = query.query(&mut *conn).await?;
         let row = stream.into_first_result().await?;
-        
+
         if let Some(row) = row.into_iter().next() {
             let id: i64 = row.get(0).unwrap();
             info!("Inserted URL with ID: {}", id);
@@ -236,10 +267,15 @@ impl DatabaseService {
         }
     }
 
-    pub async fn get_original_url(pool: &DatabasePool, shortened_url: &str) -> Result<Option<String>> {
-        let mut conn = pool.get().await
+    pub async fn get_original_url(
+        pool: &DatabasePool,
+        shortened_url: &str,
+    ) -> Result<Option<String>> {
+        let mut conn = pool
+            .get()
+            .await
             .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
-            
+
         let query = "USE TaloraDB; SELECT original_url FROM urls WHERE shortened_url = @P1";
 
         let mut query = tiberius::Query::new(query);
@@ -257,9 +293,11 @@ impl DatabaseService {
     }
 
     pub async fn url_exists(pool: &DatabasePool, shortened_url: &str) -> Result<bool> {
-        let mut conn = pool.get().await
+        let mut conn = pool
+            .get()
+            .await
             .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
-            
+
         let query = "USE TaloraDB; SELECT COUNT(*) FROM urls WHERE shortened_url = @P1";
 
         let mut query = tiberius::Query::new(query);
