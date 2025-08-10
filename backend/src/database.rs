@@ -107,7 +107,7 @@ pub async fn create_connection_pool(config: &DatabaseConfig) -> Result<DatabaseP
 
     // Parse connection string for Tiberius
     let mut tiberius_config =
-        Config::from_ado_string(&config.connection_string) // <-- Make it mutable
+        Config::from_ado_string(&config.connection_string)
             .map_err(|e| anyhow::anyhow!("Invalid DATABASE_URL format: {}", e))?;
     if !config.encryption_enabled {
         tiberius_config.encryption(tiberius::EncryptionLevel::NotSupported);
