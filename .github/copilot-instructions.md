@@ -43,9 +43,10 @@ Before beginning development, ensure the following tools are installed:
   - Source the environment: `source ~/.cargo/env`
   - Install additional components: `rustup component add clippy rustfmt`
 
-- **Node.js & npm**: Required for React frontend development
+- **Node.js & pnpm**: Required for React frontend development
   - Install Node.js LTS: `curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - && sudo apt-get install -y nodejs`
-  - Verify installation: `node --version && npm --version`
+  - Install pnpm: `npm install -g pnpm`
+  - Verify installation: `node --version && pnpm --version`
 
 ### Initial Repository Setup
 When the implementation is added, follow these steps:
@@ -58,10 +59,10 @@ When the implementation is added, follow these steps:
 
 2. **Install dependencies** (when package.json exists):
    ```bash
-   npm install
+   pnpm install
    ```
    - **TIMING**: Frontend dependency installation typically takes 2-5 minutes
-   - **NEVER CANCEL**: Set timeout to 10+ minutes to account for network variations
+   - **NEVER CANCEL**: Set timeout to 15+ minutes to account for network variations and pnpm's package resolution
 
 3. **Backend setup** (when Cargo.toml exists):
    ```bash
@@ -77,7 +78,7 @@ When the implementation is added, follow these steps:
 #### Frontend Build (when implemented):
 ```bash
 cd frontend
-npm run build
+pnpm run build
 ```
 - **TIMING**: React production builds typically take 2-5 minutes
 - **NEVER CANCEL**: Set timeout to 10+ minutes for complex applications
@@ -112,7 +113,7 @@ cargo build --release
 3. **Start the frontend**:
    ```bash
    cd frontend
-   npm run dev
+   pnpm run dev
    ```
    - **TIMING**: Vite/React dev server starts in 10-30 seconds
    - Frontend typically runs on `http://localhost:3000`
@@ -129,7 +130,7 @@ docker-compose up -d
 #### Frontend Tests (when implemented):
 ```bash
 cd frontend
-npm test
+pnpm test
 ```
 - **TIMING**: React test suites typically take 1-3 minutes
 - **NEVER CANCEL**: Set timeout to 10+ minutes for comprehensive test suites
@@ -163,14 +164,14 @@ docker-compose -f docker-compose.test.yml up --abort-on-container-exit
 2. **Frontend formatting and linting**:
    ```bash
    cd frontend
-   npm run lint
-   npm run format:check
+   pnpm run lint
+   pnpm run format:check
    ```
 
 3. **Type checking**:
    ```bash
    cd frontend
-   npm run type-check
+   pnpm run type-check
    ```
 
 #### Manual Validation Requirements
@@ -265,7 +266,7 @@ docker-compose -f docker-compose.test.yml up --abort-on-container-exit
 ### Performance Optimization:
 1. Monitor database query performance with SQL Server profiler
 2. Optimize Rust code with `cargo bench` (when benchmarks exist)
-3. Analyze frontend bundle size with `npm run analyze`
+3. Analyze frontend bundle size with `pnpm run analyze`
 4. Always measure before and after optimization changes
 
 ## CI/CD Integration
@@ -274,7 +275,7 @@ docker-compose -f docker-compose.test.yml up --abort-on-container-exit
 The repository includes automated workflows for:
 - **Build verification**: Runs on every PR
 - **Test execution**: Unit and integration tests
-- **Security scanning**: Rust and npm dependency audits
+- **Security scanning**: Rust and pnpm dependency audits
 - **Container building**: Docker image creation
 
 **TIMING EXPECTATIONS**:
@@ -287,11 +288,11 @@ Always run before pushing:
 ```bash
 # Format and lint all code
 cd backend && cargo fmt && cargo clippy
-cd ../frontend && npm run lint && npm run format
+cd ../frontend && pnpm run lint && pnpm run format
 
 # Run tests
 cd backend && cargo test
-cd ../frontend && npm test
+cd ../frontend && pnpm test
 
 # Build verification
 docker-compose build
@@ -317,7 +318,7 @@ docker-compose build
    - Check Cargo.lock for dependency conflicts
 
 4. **Frontend build failures**:
-   - Clear node_modules: `rm -rf node_modules && npm install`
+   - Clear node_modules: `rm -rf node_modules && pnpm install`
    - Check Node.js version compatibility
    - Verify TypeScript configuration
 
@@ -332,7 +333,7 @@ docker-compose build
 - **Never commit secrets**: Use environment variables for configuration
 - **HTTPS required**: Passkey authentication requires secure context
 - **Database security**: Use strong passwords and network isolation
-- **Dependencies**: Regularly audit with `cargo audit` and `npm audit`
+- **Dependencies**: Regularly audit with `cargo audit` and `pnpm audit`
 
 ### Production Deployment:
 - **Container security**: Scan images with vulnerability tools
