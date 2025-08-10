@@ -540,6 +540,53 @@ impl DatabaseService {
         }
     }
 
+    pub async fn get_domain_by_id(
+        pool: &DatabasePool,
+        domain_id: i64,
+    ) -> Result<Option<DomainEntry>> {
+        let mut conn = pool
+            .get()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
+
+        let database_name = Self::get_database_name();
+        let query_sql = format!(
+            "USE [{}]; 
+            SELECT id, user_id, domain_name, is_verified, verification_token, created_at, updated_at 
+            FROM domains 
+            WHERE id = @P1",
+            database_name
+        );
+
+        let mut query = tiberius::Query::new(&query_sql);
+        query.bind(domain_id);
+
+        let stream = query.query(&mut *conn).await?;
+        let rows = stream.into_first_result().await?;
+
+        if let Some(row) = rows.into_iter().next() {
+            let id: i64 = row.get(0).unwrap();
+            let user_id: Option<i64> = row.get(1);
+            let domain_name: &str = row.get(2).unwrap();
+            let is_verified: bool = row.get(3).unwrap();
+            let verification_token: Option<&str> = row.get(4);
+            let created_at: chrono::DateTime<chrono::Utc> = row.get(5).unwrap();
+            let updated_at: chrono::DateTime<chrono::Utc> = row.get(6).unwrap();
+
+            Ok(Some(DomainEntry {
+                id,
+                user_id,
+                domain_name: domain_name.to_string(),
+                is_verified,
+                verification_token: verification_token.map(|s| s.to_string()),
+                created_at,
+                updated_at,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub async fn get_verified_domains(pool: &DatabasePool) -> Result<Vec<DomainEntry>> {
         let mut conn = pool
             .get()
@@ -648,6 +695,33 @@ impl DatabaseService {
 
         let mut query = tiberius::Query::new(&query);
         query.bind(domain_name);
+        query.bind(is_verified);
+
+        let result = query.execute(&mut *conn).await?;
+        Ok(result.rows_affected().len() > 0)
+    }
+
+    pub async fn update_domain_verification_by_id(
+        pool: &DatabasePool,
+        domain_id: i64,
+        is_verified: bool,
+    ) -> Result<bool> {
+        let mut conn = pool
+            .get()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
+
+        let database_name = Self::get_database_name();
+        let query = format!(
+            "USE [{}];
+            UPDATE domains 
+            SET is_verified = @P2, updated_at = GETUTCDATE()
+            WHERE id = @P1",
+            database_name
+        );
+
+        let mut query = tiberius::Query::new(&query);
+        query.bind(domain_id);
         query.bind(is_verified);
 
         let result = query.execute(&mut *conn).await?;

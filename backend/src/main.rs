@@ -88,39 +88,56 @@ impl DomainValidationService {
     async fn verify_dns_txt_record(domain: &str, expected_token: &str) -> bool {
         info!("Checking DNS TXT record for domain: {} with token: {}", domain, expected_token);
         
-        // In a real implementation, this would:
-        // 1. Query _thalora-verification.{domain} for TXT records
-        // 2. Check if any record matches the expected_token
-        // 3. Return true if found, false otherwise
+        // Check if verification should be skipped (development mode)
+        if let Ok(skip_verification) = std::env::var("SKIP_DOMAIN_VERIFICATION") {
+            if skip_verification.to_lowercase() == "true" {
+                info!("DNS verification skipped (SKIP_DOMAIN_VERIFICATION=true)");
+                return true;
+            }
+        }
         
-        // For now, simulate verification (you would replace this with actual DNS lookup)
-        // Example using trust-dns-resolver crate:
-        /*
-        use trust_dns_resolver::Resolver;
+        // Perform actual DNS TXT record lookup
         use trust_dns_resolver::config::*;
+        use trust_dns_resolver::Resolver;
         
-        let resolver = Resolver::new(ResolverConfig::default(), ResolverOpts::default()).unwrap();
+        let resolver = match Resolver::new(ResolverConfig::default(), ResolverOpts::default()) {
+            Ok(resolver) => resolver,
+            Err(e) => {
+                error!("Failed to create DNS resolver: {}", e);
+                return false;
+            }
+        };
+        
         let lookup_name = format!("_thalora-verification.{}", domain);
+        info!("Looking up TXT records for: {}", lookup_name);
         
-        match resolver.txt_lookup(&lookup_name).await {
+        match resolver.txt_lookup(&lookup_name) {
             Ok(txt_records) => {
+                info!("Found {} TXT records for {}", txt_records.iter().count(), lookup_name);
+                
                 for record in txt_records.iter() {
-                    let txt_data = record.txt_data().iter().map(|b| *b).collect::<Vec<u8>>();
+                    // Convert TXT record data to string
+                    let txt_data: Vec<u8> = record.txt_data().iter().flat_map(|data| data.iter()).cloned().collect();
+                    
                     if let Ok(txt_string) = String::from_utf8(txt_data) {
-                        if txt_string.trim() == expected_token {
+                        let txt_value = txt_string.trim();
+                        info!("Found TXT record value: '{}'", txt_value);
+                        
+                        if txt_value == expected_token {
+                            info!("✅ DNS verification successful for domain: {}", domain);
                             return true;
                         }
                     }
                 }
+                
+                warn!("❌ DNS verification failed: expected token '{}' not found in TXT records for {}", expected_token, lookup_name);
                 false
             }
-            Err(_) => false
+            Err(e) => {
+                warn!("❌ DNS lookup failed for {}: {}", lookup_name, e);
+                false
+            }
         }
-        */
-        
-        // For demo purposes, return false (domains remain unverified until manual verification)
-        warn!("DNS TXT record verification not implemented - domain remains unverified");
-        false
     }
 }
 
@@ -212,32 +229,38 @@ async fn shorten_url(
                 info!("Using custom domain: {}", domain.domain_name);
                 format!("https://{}", domain.domain_name)
             } else {
-                // Fall back to default domain
-                let connection_info = http_req.connection_info();
-                let scheme = connection_info.scheme();
-                let host = connection_info.host();
+                // Check if we allow fallback to localhost in development
+                let skip_verification = std::env::var("SKIP_DOMAIN_VERIFICATION")
+                    .unwrap_or_else(|_| "false".to_string())
+                    .to_lowercase() == "true";
                 
-                // Fallback to localhost:8080 if connection info is not reliable
-                if host.is_empty() || scheme.is_empty() {
-                    info!("Connection info not reliable (scheme: '{}', host: '{}'), falling back to localhost:8080", scheme, host);
-                    "http://localhost:8080".to_string()
+                if skip_verification {
+                    info!("No verified domains available, using localhost fallback (development mode)");
+                    // Fall back to default domain in development
+                    let connection_info = http_req.connection_info();
+                    let scheme = connection_info.scheme();
+                    let host = connection_info.host();
+                    
+                    // Fallback to localhost:8080 if connection info is not reliable
+                    if host.is_empty() || scheme.is_empty() {
+                        info!("Connection info not reliable (scheme: '{}', host: '{}'), falling back to localhost:8080", scheme, host);
+                        "http://localhost:8080".to_string()
+                    } else {
+                        format!("{}://{}", scheme, host)
+                    }
                 } else {
-                    format!("{}://{}", scheme, host)
+                    error!("No verified domains available and fallback disabled (production mode)");
+                    return Ok(HttpResponse::BadRequest().json(ErrorResponse {
+                        error: "No verified domains available for URL shortening. Please add and verify a custom domain first.".to_string(),
+                    }));
                 }
             }
         }
         Err(e) => {
             error!("Failed to retrieve domains: {}", e);
-            // Fall back to default domain on error
-            let connection_info = http_req.connection_info();
-            let scheme = connection_info.scheme();
-            let host = connection_info.host();
-            
-            if host.is_empty() || scheme.is_empty() {
-                "http://localhost:8080".to_string()
-            } else {
-                format!("{}://{}", scheme, host)
-            }
+            return Ok(HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Failed to retrieve domain information".to_string(),
+            }));
         }
     };
 
@@ -366,6 +389,82 @@ async fn list_domains(db_pool: AppDatabasePool) -> Result<HttpResponse> {
     }
 }
 
+// POST /domains/{id}/verify endpoint - verify a domain by checking DNS TXT record
+async fn verify_domain(
+    path: web::Path<i64>,
+    db_pool: AppDatabasePool,
+) -> Result<HttpResponse> {
+    let domain_id = path.into_inner();
+    
+    info!("Received domain verification request for ID: {}", domain_id);
+    
+    // Get the domain from the database
+    let domain = match DatabaseService::get_domain_by_id(&db_pool, domain_id).await {
+        Ok(Some(domain)) => domain,
+        Ok(None) => {
+            return Ok(HttpResponse::NotFound().json(ErrorResponse {
+                error: "Domain not found".to_string(),
+            }));
+        }
+        Err(e) => {
+            error!("Database error retrieving domain: {}", e);
+            return Ok(HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Database error".to_string(),
+            }));
+        }
+    };
+    
+    if domain.is_verified {
+        return Ok(HttpResponse::Ok().json(AddDomainResponse {
+            id: domain.id,
+            domain_name: domain.domain_name.clone(),
+            is_verified: true,
+            verification_status: "Domain is already verified".to_string(),
+        }));
+    }
+    
+    // Check if domain has a verification token
+    let verification_token = match domain.verification_token {
+        Some(token) => token,
+        None => {
+            return Ok(HttpResponse::BadRequest().json(ErrorResponse {
+                error: "Domain has no verification token. Please re-add the domain.".to_string(),
+            }));
+        }
+    };
+    
+    // Verify the DNS TXT record
+    let is_verified = DomainValidationService::verify_dns_txt_record(&domain.domain_name, &verification_token).await;
+    
+    if is_verified {
+        // Update domain as verified in database
+        match DatabaseService::update_domain_verification_by_id(&db_pool, domain_id, true).await {
+            Ok(_) => {
+                info!("✅ Domain '{}' successfully verified", domain.domain_name);
+                Ok(HttpResponse::Ok().json(AddDomainResponse {
+                    id: domain.id,
+                    domain_name: domain.domain_name,
+                    is_verified: true,
+                    verification_status: "Domain successfully verified!".to_string(),
+                }))
+            }
+            Err(e) => {
+                error!("Failed to update domain verification status: {}", e);
+                Ok(HttpResponse::InternalServerError().json(ErrorResponse {
+                    error: "Failed to update domain verification status".to_string(),
+                }))
+            }
+        }
+    } else {
+        Ok(HttpResponse::BadRequest().json(ErrorResponse {
+            error: format!(
+                "Domain verification failed. Please ensure the TXT record '_thalora-verification.{}' contains the value: {}",
+                domain.domain_name, verification_token
+            ),
+        }))
+    }
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     // Load environment variables from .env file if it exists
@@ -440,6 +539,7 @@ async fn main() -> std::io::Result<()> {
             .route("/shortened-url/{id}", web::get().to(redirect_url))
             .route("/domains", web::post().to(add_domain))
             .route("/domains", web::get().to(list_domains))
+            .route("/domains/{id}/verify", web::post().to(verify_domain))
     })
     .bind(&bind_address)?
     .run()

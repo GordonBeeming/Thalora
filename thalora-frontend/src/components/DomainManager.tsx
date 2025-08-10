@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DomainEntry, addDomain, listDomains, ThaloriApiError } from '../services/api';
+import { DomainEntry, addDomain, listDomains, ThaloraApiError } from '../services/api';
 import './DomainManager.css';
 
 interface DomainManagerProps {
@@ -26,7 +26,7 @@ const DomainManager: React.FC<DomainManagerProps> = ({ onDomainAdded }) => {
       setDomains(fetchedDomains);
     } catch (error) {
       console.error('Error fetching domains:', error);
-      setError(error instanceof ThaloriApiError ? error.message : 'Failed to load domains');
+      setError(error instanceof ThaloraApiError ? error.message : 'Failed to load domains');
     } finally {
       setIsLoadingDomains(false);
     }
@@ -57,7 +57,7 @@ const DomainManager: React.FC<DomainManagerProps> = ({ onDomainAdded }) => {
       }
     } catch (error) {
       console.error('Error adding domain:', error);
-      setError(error instanceof ThaloriApiError ? error.message : 'An unexpected error occurred');
+      setError(error instanceof ThaloraApiError ? error.message : 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
     }

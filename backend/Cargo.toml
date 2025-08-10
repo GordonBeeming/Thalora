@@ -28,6 +28,8 @@ thiserror = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 # Regex for connection string processing
 regex = "1.10"
+# DNS resolution for TXT record verification
+trust-dns-resolver = "0.23"
 
 [dev-dependencies]
 actix-rt = "2.9"

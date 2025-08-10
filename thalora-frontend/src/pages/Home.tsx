@@ -4,7 +4,7 @@ import Footer from '../components/Footer';
 import URLForm from '../components/URLForm';
 import URLDisplay from '../components/URLDisplay';
 import DomainManager from '../components/DomainManager';
-import { shortenUrl, ThaloriApiError } from '../services/api';
+import { shortenUrl, ThaloraApiError } from '../services/api';
 import './Home.css';
 
 const Home: React.FC = () => {
@@ -26,7 +26,7 @@ const Home: React.FC = () => {
     } catch (error) {
       console.error('Error shortening URL:', error);
       
-      if (error instanceof ThaloriApiError) {
+      if (error instanceof ThaloraApiError) {
         setError(error.message);
       } else {
         setError('An unexpected error occurred. Please try again.');

@@ -2,9 +2,6 @@
 -- Created: 2025-01-XX
 -- Description: Adds the domains table to support custom domain functionality
 
-USE TaloraDB;
-GO
-
 -- Create domains table for storing custom domains
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'domains')
 BEGIN
