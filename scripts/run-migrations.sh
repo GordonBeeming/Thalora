@@ -40,10 +40,20 @@ get_database_name() {
         if [[ $connection_string =~ Database=([^;]+) ]]; then
             echo "${BASH_REMATCH[1]}"
         else
-            echo "master"
+            print_status $RED "Error: No Database parameter found in DATABASE_URL. Connection string must include Database=<database_name>"
+            exit 1
+        fi
+    elif [[ -f "$SCRIPT_DIR/../.env" ]]; then
+        local connection_string=$(grep "^DATABASE_URL=" "$SCRIPT_DIR/../.env" | cut -d'=' -f2-)
+        if [[ $connection_string =~ Database=([^;]+) ]]; then
+            echo "${BASH_REMATCH[1]}"
+        else
+            print_status $RED "Error: No Database parameter found in DATABASE_URL. Connection string must include Database=<database_name>"
+            exit 1
         fi
     else
-        echo "master"
+        print_status $RED "Error: No .env file found. Please create .env file with DATABASE_URL"
+        exit 1
     fi
 }
 
@@ -61,6 +71,11 @@ execute_sql() {
         if [[ $connection_string =~ Password=([^;]+) ]]; then
             password="${BASH_REMATCH[1]}"
         fi
+    elif [[ -f "$SCRIPT_DIR/../.env" ]]; then
+        local connection_string=$(grep "^DATABASE_URL=" "$SCRIPT_DIR/../.env" | cut -d'=' -f2-)
+        if [[ $connection_string =~ Password=([^;]+) ]]; then
+            password="${BASH_REMATCH[1]}"
+        fi
     fi
     
     if [[ -z "$password" ]]; then
@@ -73,7 +88,7 @@ execute_sql() {
         sqlcmd -S localhost,1433 -U sa -P "$password" -d "$database" -i "$file" -b
     else
         print_status $YELLOW "Warning: sqlcmd not available, using docker exec"
-        docker exec -i $(docker compose ps -q sqlserver) /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "$password" -d "$database" -i /dev/stdin < "$file"
+        docker exec -i $(docker compose ps -q sqlserver) /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$password" -d "$database" -C -i /dev/stdin < "$file"
     fi
 }
 
@@ -86,6 +101,11 @@ is_migration_applied() {
     local password=""
     if [[ -f "$SCRIPT_DIR/../backend/.env" ]]; then
         local connection_string=$(grep "^DATABASE_URL=" "$SCRIPT_DIR/../backend/.env" | cut -d'=' -f2-)
+        if [[ $connection_string =~ Password=([^;]+) ]]; then
+            password="${BASH_REMATCH[1]}"
+        fi
+    elif [[ -f "$SCRIPT_DIR/../.env" ]]; then
+        local connection_string=$(grep "^DATABASE_URL=" "$SCRIPT_DIR/../.env" | cut -d'=' -f2-)
         if [[ $connection_string =~ Password=([^;]+) ]]; then
             password="${BASH_REMATCH[1]}"
         fi
@@ -103,7 +123,7 @@ is_migration_applied() {
     if command -v sqlcmd >/dev/null 2>&1; then
         result=$(sqlcmd -S localhost,1433 -U sa -P "$password" -d "$database" -Q "$query" -h -1 -W 2>/dev/null | tr -d ' \n\r')
     else
-        result=$(docker exec -i $(docker compose ps -q sqlserver) /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "$password" -d "$database" -Q "$query" -h -1 -W 2>/dev/null | tr -d ' \n\r')
+        result=$(docker exec -i $(docker compose ps -q sqlserver) /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$password" -d "$database" -C -Q "$query" -h -1 -W 2>/dev/null | tr -d ' \n\r')
     fi
     
     [[ "$result" == "1" ]]
@@ -122,6 +142,16 @@ record_migration() {
         if [[ $connection_string =~ Password=([^;]+) ]]; then
             password="${BASH_REMATCH[1]}"
         fi
+    elif [[ -f "$SCRIPT_DIR/../.env" ]]; then
+        local connection_string=$(grep "^DATABASE_URL=" "$SCRIPT_DIR/../.env" | cut -d'=' -f2-)
+        if [[ $connection_string =~ Password=([^;]+) ]]; then
+            password="${BASH_REMATCH[1]}"
+        fi
+    fi
+    
+    if [[ -z "$password" ]]; then
+        print_status $RED "Error: Could not extract password from DATABASE_URL in .env file"
+        exit 1
     fi
     
     local query="INSERT INTO schema_migrations (migration_hash, migration_filename) VALUES ('$hash', '$filename')"
@@ -129,7 +159,7 @@ record_migration() {
     if command -v sqlcmd >/dev/null 2>&1; then
         sqlcmd -S localhost,1433 -U sa -P "$password" -d "$database" -Q "$query"
     else
-        docker exec -i $(docker compose ps -q sqlserver) /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "$password" -d "$database" -Q "$query"
+        docker exec -i $(docker compose ps -q sqlserver) /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$password" -d "$database" -C -Q "$query"
     fi
 }
 

@@ -8,6 +8,27 @@ Thalora is a modern, secure, and customizable URL shortener built with React (fr
 
 **CRITICAL**: This repository currently contains only project specifications in README.md. The actual implementation (React frontend, Rust backend, Docker configuration) has not been developed yet. Most build and run commands described below cannot be executed until the implementation is complete.
 
+## Core Principles
+
+**CRITICAL RULES**: The following principles must be followed for all development decisions:
+
+### Configuration Management
+- **Never use fallbacks in configuration**: If config values cannot be extracted (e.g., database name from connection string), throw an error immediately. Config should be correct or fail fast.
+- **No hardcoded values in production code**: All configuration values must come from environment variables or config files.
+- **Explicit configuration failures**: When config extraction fails, provide clear error messages explaining exactly what is missing.
+
+### Database and Schema Management
+- **Never create schema in application code**: Production applications should only have read/write access to the database schema, not create it.
+- **Migrations are separate from application**: All database schema changes must be in migration scripts, never in the application code.
+- **Database-first deployments**: Migrations run before application deployment, not during application startup.
+- **No USE statements when database is in connection string**: If the connection string specifies a database, SQL queries should not include `USE [database]` statements.
+
+### Feedback Integration
+- **Update instructions for coding patterns**: When specific feedback is given about "doing something a certain way", immediately update these instructions to include that pattern as a core principle.
+- **Document architectural decisions**: All feedback about production practices should be captured in these instructions to prevent future violations.
+
+**ALWAYS reference these principles first when making any coding decisions.**
+
 ## Working Effectively
 
 ### Prerequisites Setup

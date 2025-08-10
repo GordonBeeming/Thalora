@@ -25,7 +25,7 @@ services:
       dockerfile: Dockerfile
     container_name: thalora-backend
     environment:
-      - DATABASE_URL=Server=sqlserver,1433;Database=master;User=sa;Password=TaloraDevPassword123!;TrustServerCertificate=true;
+      - DATABASE_URL=Server=sqlserver,1433;Database=TaloraDB;User=sa;Password=TaloraDevPassword123!;TrustServerCertificate=true;
       - RUST_LOG=info
     ports:
       - "8080:8080"

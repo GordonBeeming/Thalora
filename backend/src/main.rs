@@ -503,13 +503,6 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
-    // Initialize database schema (create database and tables if they don't exist)
-    if let Err(e) = DatabaseService::initialize_database(&db_pool, &db_config).await {
-        error!("Failed to initialize database: {}", e);
-        error!("Make sure SQL Server is running and the user has sufficient privileges");
-        std::process::exit(1);
-    }
-
     info!("Database connection pool established successfully");
 
     // Get server configuration from environment or use defaults
