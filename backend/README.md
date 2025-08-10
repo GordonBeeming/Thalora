@@ -28,7 +28,7 @@ This is the **recommended approach** for development as it provides:
 3. **Run Frontend Locally:**
    ```bash
    cd thalora-frontend  
-   npm run dev
+   pnpm run dev
    ```
 
 ### Alternative: Full Docker Setup
@@ -41,11 +41,11 @@ docker compose up -d
 
 # Frontend still runs locally for development
 cd thalora-frontend
-npm run dev
+pnpm run dev
 ```
 
 **Note:** The frontend is intentionally **not** included in Docker Compose because:
-- Frontend development benefits from hot reload (`npm run dev`)
+- Frontend development benefits from hot reload (`pnpm run dev`)
 - No complex dependencies like SQL Server
 - Easier debugging and faster iteration
 

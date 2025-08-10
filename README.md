@@ -23,7 +23,7 @@
 ### Prerequisites
 - **Docker** and **Docker Compose** for containerization.
 - **Rust** for backend development (if modifying backend code).
-- **Node.js** and **npm** for frontend development (if modifying frontend code).
+- **Node.js** and **pnpm** for frontend development (if modifying frontend code).
 
 ### Getting Started
 
@@ -39,7 +39,7 @@
 ### Prerequisites
 - **Docker** and **Docker Compose** for running SQL Server
 - **Rust** for backend development
-- **Node.js** and **npm** for frontend development
+- **Node.js** and **pnpm** for frontend development
 
 ### Database Setup
 
@@ -47,7 +47,7 @@ The application uses **SQL Server** for persistent URL storage. To set up the da
 
 1. **Quick Setup (Recommended)**:
    ```bash
-   ./scripts/setup-dev-db.sh
+   ./scripts/reset-db.sh
    ```
 
 2. **Manual Setup**:
@@ -97,24 +97,24 @@ The application uses **SQL Server** for persistent URL storage. To set up the da
 
 2. Install Node.js dependencies:
    ```bash
-   npm install
+   pnpm install
    ```
 
 3. Start the development server:
    ```bash
-   npm start
+   pnpm start
    ```
    
    The frontend will start on `http://localhost:3000` and automatically open in your browser.
 
 4. To run the tests:
    ```bash
-   npm test
+   pnpm test
    ```
 
 5. To build for production:
    ```bash
-   npm run build
+   pnpm run build
    ```
 
 ### Running Both Applications Together
@@ -135,8 +135,8 @@ To run the complete Thalora application:
 3. **Terminal 3 - Start the frontend:**
    ```bash
    cd thalora-frontend
-   npm install  # Only needed the first time
-   npm start
+   pnpm install  # Only needed the first time
+   pnpm start
    ```
 
 4. **Access the application:**

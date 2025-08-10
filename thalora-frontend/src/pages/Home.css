@@ -21,6 +21,57 @@
   gap: var(--spacing-xl);
 }
 
+/* Tab Navigation */
+.home__tabs {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  background: white;
+  border-radius: var(--border-radius-lg);
+  padding: 0.5rem;
+  box-shadow: var(--shadow-md);
+  max-width: 600px;
+  margin: 0 auto var(--spacing-xl) auto;
+}
+
+.home__tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--border-radius-md);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex: 1;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.home__tab:hover {
+  color: var(--primary);
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.home__tab--active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: var(--shadow-md);
+}
+
+.home__tab--active:hover {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.home__tab-icon {
+  font-size: 1.125rem;
+}
+
 .home__form-section {
   display: flex;
   flex-direction: column;
@@ -87,6 +138,13 @@
   margin-top: var(--spacing-lg);
 }
 
+.home__domain-section {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: var(--spacing-lg);
+}
+
 .home__features {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -140,6 +198,19 @@
     gap: var(--spacing-lg);
   }
   
+  .home__tabs {
+    margin: 0 1rem var(--spacing-lg) 1rem;
+  }
+  
+  .home__tab {
+    padding: 0.625rem 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .home__tab-icon {
+    font-size: 1rem;
+  }
+  
   .home__features {
     grid-template-columns: 1fr;
     gap: var(--spacing-md);
@@ -169,6 +240,17 @@
   
   .home__form-container {
     gap: var(--spacing-md);
+  }
+  
+  .home__tabs {
+    flex-direction: column;
+    gap: 0.25rem;
+    margin: 0 0.5rem var(--spacing-lg) 0.5rem;
+  }
+  
+  .home__tab {
+    padding: 0.75rem;
+    flex: none;
   }
   
   .home__feature {

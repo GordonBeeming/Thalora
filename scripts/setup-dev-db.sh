@@ -40,7 +40,23 @@ fi
 echo ""
 echo "🎉 Database setup complete!"
 echo ""
-echo "The backend will automatically create the TaloraDB database and tables when you run it."
+echo "🚀 Running database migrations..."
+
+# Get the directory of this script
+SCRIPT_DIR="$(dirname "$0")"
+
+# Run migrations
+if "$SCRIPT_DIR/run-migrations.sh"; then
+    echo ""
+    echo "✅ Migrations completed successfully!"
+else
+    echo ""
+    echo "❌ Migration failed! Please check the logs above."
+    exit 1
+fi
+
+echo ""
+echo "The backend will now connect to the properly configured database."
 echo ""
 echo "To start the backend:"
 echo "  cd backend && cargo run"
