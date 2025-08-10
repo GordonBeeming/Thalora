@@ -142,7 +142,7 @@ pub async fn create_connection_pool(config: &DatabaseConfig) -> Result<DatabaseP
 
         let _rows = stream.into_first_result().await?;
         info!("Connection pool test successful");
-    } // conn is dropped here
+    }
 
     Ok(pool)
 }
