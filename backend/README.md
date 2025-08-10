@@ -6,7 +6,7 @@ This is the Rust backend for the Thalora URL Shortener application. It provides 
 
 - **URL Shortening**: POST `/shorten` endpoint to create shortened URLs
 - **URL Redirection**: GET `/shortened-url/:id` endpoint for redirecting to original URLs
-- **URL Validation**: Validates input URLs to ensure they are well-formed HTTP/HTTPS URLs
+- **URL Validation**: Validates input URLs to ensure they are well-formed HTTPS URLs
 - **Error Handling**: Comprehensive error responses for invalid inputs
 - **Logging**: Request logging and application logging for monitoring
 - **In-Memory Storage**: Currently uses HashMap for URL storage (will be replaced with database in future)
