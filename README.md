@@ -32,3 +32,102 @@
    ```bash
    git clone https://github.com/gordonbeeming/thalora.git
    cd thalora
+   ```
+
+## Running the Applications
+
+### Backend (Rust API)
+
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+
+2. Install Rust dependencies and run the backend:
+   ```bash
+   cargo run
+   ```
+   
+   The backend will start on `http://localhost:8080`
+
+3. To run in release mode (optimized):
+   ```bash
+   cargo run --release
+   ```
+
+4. To run the tests:
+   ```bash
+   cargo test
+   ```
+
+### Frontend (React)
+
+1. Open a new terminal and navigate to the frontend directory:
+   ```bash
+   cd thalora-frontend
+   ```
+
+2. Install Node.js dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Start the development server:
+   ```bash
+   npm start
+   ```
+   
+   The frontend will start on `http://localhost:3000` and automatically open in your browser.
+
+4. To run the tests:
+   ```bash
+   npm test
+   ```
+
+5. To build for production:
+   ```bash
+   npm run build
+   ```
+
+### Running Both Applications Together
+
+To run the complete Thalora application:
+
+1. **Terminal 1 - Start the backend:**
+   ```bash
+   cd backend
+   cargo run
+   ```
+   
+2. **Terminal 2 - Start the frontend:**
+   ```bash
+   cd thalora-frontend
+   npm install  # Only needed the first time
+   npm start
+   ```
+
+3. **Access the application:**
+   - Frontend: `http://localhost:3000`
+   - Backend API: `http://localhost:8080`
+   - API Health Check: `http://localhost:8080/health`
+
+The frontend will automatically communicate with the backend API running on port 8080. Make sure both servers are running for full functionality.
+
+### API Endpoints
+
+The backend provides the following endpoints:
+
+- `GET /health` - Health check endpoint
+- `POST /shorten` - Create a shortened URL (HTTPS URLs only)
+- `GET /shortened-url/{id}` - Redirect to the original URL
+
+### Example Usage
+
+Once both applications are running, you can:
+
+1. Open `http://localhost:3000` in your browser
+2. Enter an HTTPS URL (e.g., `https://www.example.com`) 
+3. Click "Shorten URL" to generate a shortened link
+4. Use the shortened link to redirect to the original URL
+
+> **Note**: Only HTTPS URLs are supported for security reasons. HTTP URLs will be rejected with an error message.
