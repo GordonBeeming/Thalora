@@ -86,7 +86,7 @@ async fn shorten_url(
 
     // Return the shortened URL
     Ok(HttpResponse::Ok().json(ShortenResponse {
-        short_url: format!("https://localhost:8080/shortened-url/{short_id}"),
+        short_url: format!("http://localhost:8080/shortened-url/{short_id}"),
         original_url: original_url.to_string(),
     }))
 }
