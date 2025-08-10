@@ -116,7 +116,7 @@ impl DatabaseConfig {
         // Parse the connection string to find the Database parameter
         for part in connection_string.split(';') {
             let part = part.trim();
-            if part.to_lowercase().starts_with("database=") {
+            if part.len() >= 9 && part[..9].eq_ignore_ascii_case("database=") {
                 let db_name = part.split('=').nth(1).unwrap_or("").trim();
                 if db_name.is_empty() {
                     return Err(anyhow::anyhow!("Empty database name in connection string"));
