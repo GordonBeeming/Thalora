@@ -23,6 +23,11 @@ Thalora is a modern, secure, and customizable URL shortener built with React (fr
 - **Database-first deployments**: Migrations run before application deployment, not during application startup.
 - **No USE statements when database is in connection string**: If the connection string specifies a database, SQL queries should not include `USE [database]` statements.
 
+### Code Quality Standards
+- **Zero warnings policy**: All warnings must be fixed after any work is completed. No warnings should remain in the codebase.
+- **Clean builds required**: Both backend (`cargo build`) and frontend (`pnpm build`) must compile without warnings.
+- **Warning fixes mandatory**: Address all compiler warnings immediately, never leave them for later.
+
 ### Feedback Integration
 - **Update instructions for coding patterns**: When specific feedback is given about "doing something a certain way", immediately update these instructions to include that pattern as a core principle.
 - **Document architectural decisions**: All feedback about production practices should be captured in these instructions to prevent future violations.

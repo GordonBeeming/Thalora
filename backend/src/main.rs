@@ -250,11 +250,23 @@ async fn shorten_url(
         }
     }
 
-    // Check for verified custom domains - use the first available one
+    // Check for verified custom domains - use specified domain or first available one
     let base_url = match DatabaseService::get_verified_domains(&db_pool).await {
         Ok(domains) => {
-            if let Some(domain) = domains.first() {
-                info!("Using custom domain: {}", domain.domain_name);
+            // If a specific domain was requested, try to use it
+            if let Some(requested_domain) = &req.domain {
+                if let Some(domain) = domains.iter().find(|d| d.domain_name == *requested_domain) {
+                    info!("Using requested custom domain: {}", domain.domain_name);
+                    format!("https://{}", domain.domain_name)
+                } else {
+                    // Requested domain not found or not verified
+                    info!("Requested domain '{}' not found or not verified", requested_domain);
+                    return Ok(HttpResponse::BadRequest().json(ErrorResponse {
+                        error: format!("Domain '{}' is not verified or does not exist", requested_domain),
+                    }));
+                }
+            } else if let Some(domain) = domains.first() {
+                info!("Using first available custom domain: {}", domain.domain_name);
                 format!("https://{}", domain.domain_name)
             } else {
                 // Check if we allow fallback to localhost in development
