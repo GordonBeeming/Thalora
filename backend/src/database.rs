@@ -36,15 +36,20 @@ impl DatabaseConfig {
 pub async fn create_connection(config: &DatabaseConfig) -> Result<DatabaseClient> {
     info!("Connecting to SQL Server database...");
     
-    let config = Config::from_ado_string(&config.connection_string)?;
-    let tcp = TcpStream::connect(config.get_addr()).await?;
-    let mut client = Client::connect(config, tcp.compat_write()).await?;
+    let config = Config::from_ado_string(&config.connection_string)
+        .map_err(|e| anyhow::anyhow!("Invalid DATABASE_URL format: {}", e))?;
+    
+    let tcp = TcpStream::connect(config.get_addr()).await
+        .map_err(|e| anyhow::anyhow!("Failed to connect to SQL Server at {}: {}. Make sure SQL Server is running.", config.get_addr(), e))?;
+    
+    let mut client = Client::connect(config, tcp.compat_write()).await
+        .map_err(|e| anyhow::anyhow!("Failed to authenticate with SQL Server: {}", e))?;
     
     // Test the connection with a simple query to ensure database is ready
     info!("Testing database connection...");
     let query = tiberius::Query::new("SELECT 1 as test");
     let stream = query.query(&mut client).await
-        .map_err(|e| anyhow::anyhow!("Database connection test failed: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Database connection test failed: {}. The database may not be ready or accessible.", e))?;
     
     // Consume the stream to complete the query
     let _rows = stream.into_first_result().await?;

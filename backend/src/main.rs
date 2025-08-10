@@ -236,9 +236,13 @@ async fn main() -> std::io::Result<()> {
         Ok(client) => client,
         Err(e) => {
             error!("Failed to connect to database: {}", e);
-            error!("Make sure SQL Server is running and accessible");
             error!("Connection string: {}", db_config.connection_string);
-            error!("To set up a local SQL Server database, run: ./scripts/setup-dev-db.sh");
+            error!("");
+            error!("To fix this issue:");
+            error!("1. If using Docker, run: ./scripts/setup-dev-db.sh");
+            error!("2. Or start SQL Server container: docker compose up -d sqlserver");
+            error!("3. Wait for SQL Server to be ready (about 30-60 seconds)");
+            error!("4. Then try running the backend again: cargo run");
             std::process::exit(1);
         }
     };

@@ -2,6 +2,62 @@
 
 A Rust-based URL shortener backend with SQL Server database integration.
 
+## Development Workflow
+
+### Recommended Setup (Backend Local + Database Docker)
+
+This is the **recommended approach** for development as it provides:
+- Fast compilation and debugging (local backend)
+- Easy database setup (Docker SQL Server) 
+- Hot reload capabilities
+
+1. **Start Database Only:**
+   ```bash
+   # From the repository root
+   ./scripts/setup-dev-db.sh
+   # OR manually:
+   # docker compose up -d sqlserver
+   ```
+
+2. **Run Backend Locally:**
+   ```bash
+   cd backend
+   cargo run
+   ```
+
+3. **Run Frontend Locally:**
+   ```bash
+   cd thalora-frontend  
+   npm run dev
+   ```
+
+### Alternative: Full Docker Setup
+
+Use this for production-like testing:
+
+```bash
+# Run both database and backend in containers
+docker compose up -d
+
+# Frontend still runs locally for development
+cd thalora-frontend
+npm run dev
+```
+
+**Note:** The frontend is intentionally **not** included in Docker Compose because:
+- Frontend development benefits from hot reload (`npm run dev`)
+- No complex dependencies like SQL Server
+- Easier debugging and faster iteration
+
+### Why Backend in Docker Compose?
+
+The backend is included in `docker-compose.yml` for:
+- **Production deployment** scenarios  
+- **Integration testing** with the full stack
+- **CI/CD pipelines**
+
+But for daily development, running the backend locally (`cargo run`) is faster and more convenient.
+
 ## Quick Start
 
 ### Prerequisites
