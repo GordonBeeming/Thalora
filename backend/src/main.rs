@@ -13,6 +13,7 @@ use database::{create_connection_pool, DatabaseConfig, DatabasePool, DatabaseSer
 #[derive(Deserialize)]
 struct ShortenRequest {
     url: String,
+    domain: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -50,8 +51,9 @@ impl DomainValidationService {
     fn generate_verification_token() -> String {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
-        
-        format!("thalora-verification-{}", 
+
+        format!(
+            "thalora-verification-{}",
             thread_rng()
                 .sample_iter(&Alphanumeric)
                 .take(32)
@@ -68,7 +70,11 @@ impl DomainValidationService {
         }
 
         if domain.len() > 253 {
-            return (false, "Domain name too long (max 253 characters)".to_string(), None);
+            return (
+                false,
+                "Domain name too long (max 253 characters)".to_string(),
+                None,
+            );
         }
 
         // Check for valid domain format (basic)
@@ -79,15 +85,21 @@ impl DomainValidationService {
 
         // Generate verification token
         let verification_token = Self::generate_verification_token();
-        
-        info!("Domain '{}' passed basic validation. Verification token generated.", domain);
+
+        info!(
+            "Domain '{}' passed basic validation. Verification token generated.",
+            domain
+        );
         (false, format!("Domain validation pending. Please create a TXT record: _thalora-verification.{} with value: {}", domain, verification_token), Some(verification_token))
     }
 
     // Check DNS TXT record for domain verification
     async fn verify_dns_txt_record(domain: &str, expected_token: &str) -> bool {
-        info!("Checking DNS TXT record for domain: {} with token: {}", domain, expected_token);
-        
+        info!(
+            "Checking DNS TXT record for domain: {} with token: {}",
+            domain, expected_token
+        );
+
         // Check if verification should be skipped (development mode)
         if let Ok(skip_verification) = std::env::var("SKIP_DOMAIN_VERIFICATION") {
             if skip_verification.to_lowercase() == "true" {
@@ -95,11 +107,11 @@ impl DomainValidationService {
                 return true;
             }
         }
-        
+
         // Perform actual DNS TXT record lookup
         use trust_dns_resolver::config::*;
         use trust_dns_resolver::Resolver;
-        
+
         let resolver = match Resolver::new(ResolverConfig::default(), ResolverOpts::default()) {
             Ok(resolver) => resolver,
             Err(e) => {
@@ -107,29 +119,38 @@ impl DomainValidationService {
                 return false;
             }
         };
-        
+
         let lookup_name = format!("_thalora-verification.{}", domain);
         info!("Looking up TXT records for: {}", lookup_name);
-        
+
         match resolver.txt_lookup(&lookup_name) {
             Ok(txt_records) => {
-                info!("Found {} TXT records for {}", txt_records.iter().count(), lookup_name);
-                
+                info!(
+                    "Found {} TXT records for {}",
+                    txt_records.iter().count(),
+                    lookup_name
+                );
+
                 for record in txt_records.iter() {
                     // Convert TXT record data to string
-                    let txt_data: Vec<u8> = record.txt_data().iter().flat_map(|data| data.iter()).cloned().collect();
-                    
+                    let txt_data: Vec<u8> = record
+                        .txt_data()
+                        .iter()
+                        .flat_map(|data| data.iter())
+                        .cloned()
+                        .collect();
+
                     if let Ok(txt_string) = String::from_utf8(txt_data) {
                         let txt_value = txt_string.trim();
                         info!("Found TXT record value: '{}'", txt_value);
-                        
+
                         if txt_value == expected_token {
                             info!("✅ DNS verification successful for domain: {}", domain);
                             return true;
                         }
                     }
                 }
-                
+
                 warn!("❌ DNS verification failed: expected token '{}' not found in TXT records for {}", expected_token, lookup_name);
                 false
             }
@@ -183,14 +204,15 @@ async fn shorten_url(
     if !is_valid_url(original_url) {
         info!("Invalid URL provided: {original_url}");
         return Ok(HttpResponse::BadRequest().json(ErrorResponse {
-            error: "Invalid URL format. Only HTTPS URLs are supported for security reasons.".to_string(),
+            error: "Invalid URL format. Only HTTPS URLs are supported for security reasons."
+                .to_string(),
         }));
     }
 
     // Generate unique short ID, ensuring it's not already used
     let short_id = loop {
         let candidate = generate_short_id();
-        
+
         // Check if this ID already exists in the database using the pool
         match DatabaseService::url_exists(&db_pool, &candidate).await {
             Ok(exists) => {
@@ -198,7 +220,10 @@ async fn shorten_url(
                     break candidate;
                 }
                 // If it exists, continue the loop to generate a new one
-                warn!("Generated short ID {} already exists, trying again", candidate);
+                warn!(
+                    "Generated short ID {} already exists, trying again",
+                    candidate
+                );
             }
             Err(e) => {
                 error!("Database error checking URL existence: {}", e);
@@ -212,7 +237,10 @@ async fn shorten_url(
     // Store the mapping in the database using the pool
     match DatabaseService::insert_url(&db_pool, original_url, &short_id).await {
         Ok(id) => {
-            info!("Created short URL {} for {} with database ID {}", short_id, original_url, id);
+            info!(
+                "Created short URL {} for {} with database ID {}",
+                short_id, original_url, id
+            );
         }
         Err(e) => {
             error!("Failed to store URL in database: {}", e);
@@ -232,15 +260,16 @@ async fn shorten_url(
                 // Check if we allow fallback to localhost in development
                 let skip_verification = std::env::var("SKIP_DOMAIN_VERIFICATION")
                     .unwrap_or_else(|_| "false".to_string())
-                    .to_lowercase() == "true";
-                
+                    .to_lowercase()
+                    == "true";
+
                 if skip_verification {
                     info!("No verified domains available, using localhost fallback (development mode)");
                     // Fall back to default domain in development
                     let connection_info = http_req.connection_info();
                     let scheme = connection_info.scheme();
                     let host = connection_info.host();
-                    
+
                     // Fallback to localhost:8080 if connection info is not reliable
                     if host.is_empty() || scheme.is_empty() {
                         info!("Connection info not reliable (scheme: '{}', host: '{}'), falling back to localhost:8080", scheme, host);
@@ -272,10 +301,7 @@ async fn shorten_url(
 }
 
 // GET /shortened-url/{id} endpoint
-async fn redirect_url(
-    path: web::Path<String>,
-    db_pool: AppDatabasePool,
-) -> Result<HttpResponse> {
+async fn redirect_url(path: web::Path<String>, db_pool: AppDatabasePool) -> Result<HttpResponse> {
     let short_id = path.into_inner();
 
     info!("Received redirect request for short ID: {short_id}");
@@ -350,13 +376,25 @@ async fn add_domain(
     }
 
     // Validate the domain
-    let (is_verified, verification_message, verification_token) = DomainValidationService::validate_domain(&domain_name).await;
+    let (is_verified, verification_message, verification_token) =
+        DomainValidationService::validate_domain(&domain_name).await;
 
     // Store the domain in the database
-    match DatabaseService::insert_domain(&db_pool, &domain_name, None, is_verified, verification_token.clone()).await {
+    match DatabaseService::insert_domain(
+        &db_pool,
+        &domain_name,
+        None,
+        is_verified,
+        verification_token.clone(),
+    )
+    .await
+    {
         Ok(id) => {
-            info!("Added domain '{}' with ID: {}, verified: {}", domain_name, id, is_verified);
-            
+            info!(
+                "Added domain '{}' with ID: {}, verified: {}",
+                domain_name, id, is_verified
+            );
+
             Ok(HttpResponse::Ok().json(AddDomainResponse {
                 id,
                 domain_name: domain_name.clone(),
@@ -390,14 +428,11 @@ async fn list_domains(db_pool: AppDatabasePool) -> Result<HttpResponse> {
 }
 
 // POST /domains/{id}/verify endpoint - verify a domain by checking DNS TXT record
-async fn verify_domain(
-    path: web::Path<i64>,
-    db_pool: AppDatabasePool,
-) -> Result<HttpResponse> {
+async fn verify_domain(path: web::Path<i64>, db_pool: AppDatabasePool) -> Result<HttpResponse> {
     let domain_id = path.into_inner();
-    
+
     info!("Received domain verification request for ID: {}", domain_id);
-    
+
     // Get the domain from the database
     let domain = match DatabaseService::get_domain_by_id(&db_pool, domain_id).await {
         Ok(Some(domain)) => domain,
@@ -413,7 +448,7 @@ async fn verify_domain(
             }));
         }
     };
-    
+
     if domain.is_verified {
         return Ok(HttpResponse::Ok().json(AddDomainResponse {
             id: domain.id,
@@ -422,7 +457,7 @@ async fn verify_domain(
             verification_status: "Domain is already verified".to_string(),
         }));
     }
-    
+
     // Check if domain has a verification token
     let verification_token = match domain.verification_token {
         Some(token) => token,
@@ -432,10 +467,12 @@ async fn verify_domain(
             }));
         }
     };
-    
+
     // Verify the DNS TXT record
-    let is_verified = DomainValidationService::verify_dns_txt_record(&domain.domain_name, &verification_token).await;
-    
+    let is_verified =
+        DomainValidationService::verify_dns_txt_record(&domain.domain_name, &verification_token)
+            .await;
+
     if is_verified {
         // Update domain as verified in database
         match DatabaseService::update_domain_verification_by_id(&db_pool, domain_id, true).await {
@@ -511,7 +548,7 @@ async fn main() -> std::io::Result<()> {
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(8080);
-    
+
     let bind_address = format!("{}:{}", host, port);
     info!("Server will bind to: {}", bind_address);
 
@@ -551,11 +588,11 @@ mod tests {
         assert!(is_valid_url("https://subdomain.example.com/path"));
         assert!(is_valid_url("https://subdomain.example.com/path?query=1"));
         assert!(is_valid_url("https://subdomain.example.com/path#fragment"));
-        
+
         // Invalid HTTP URLs (should be rejected)
         assert!(!is_valid_url("http://www.example.com"));
         assert!(!is_valid_url("http://example.com"));
-        
+
         // Invalid formats
         assert!(!is_valid_url("not-a-url"));
         assert!(!is_valid_url(""));
@@ -568,14 +605,14 @@ mod tests {
     fn test_generate_short_id() {
         let id1 = generate_short_id();
         let id2 = generate_short_id();
-        
+
         // Should be 8 characters long
         assert_eq!(id1.len(), 8);
         assert_eq!(id2.len(), 8);
-        
+
         // Should be different (very high probability)
         assert_ne!(id1, id2);
-        
+
         // Should only contain alphanumeric characters
         assert!(id1.chars().all(|c| c.is_ascii_alphanumeric()));
         assert!(id2.chars().all(|c| c.is_ascii_alphanumeric()));
@@ -584,7 +621,7 @@ mod tests {
     #[test]
     fn test_generate_multiple_short_ids_unique() {
         let mut ids = std::collections::HashSet::new();
-        
+
         // Generate 100 IDs and ensure they're all unique
         for _ in 0..100 {
             let id = generate_short_id();
@@ -597,13 +634,15 @@ mod tests {
     #[test]
     fn test_url_validation_edge_cases() {
         // Test various edge cases for URL validation
-        
+
         // Valid HTTPS cases
         assert!(is_valid_url("https://127.0.0.1"));
         assert!(is_valid_url("https://localhost:8080"));
         assert!(is_valid_url("https://example.co.uk/path"));
-        assert!(is_valid_url("https://sub.example.com:443/path?a=1&b=2#section"));
-        
+        assert!(is_valid_url(
+            "https://sub.example.com:443/path?a=1&b=2#section"
+        ));
+
         // Invalid cases
         assert!(!is_valid_url(""));
         assert!(!is_valid_url("   "));
@@ -611,7 +650,7 @@ mod tests {
         assert!(!is_valid_url("file:///path/to/file"));
         assert!(!is_valid_url("data:text/plain,hello"));
         assert!(!is_valid_url("javascript:alert('xss')"));
-        
+
         // HTTP should be rejected
         assert!(!is_valid_url("http://secure-site.com"));
         assert!(!is_valid_url("http://127.0.0.1:8080"));
@@ -620,41 +659,78 @@ mod tests {
     #[tokio::test]
     async fn test_domain_validation() {
         // Test domain validation logic
-        
+
         // Valid domains
         let (valid, msg, token) = DomainValidationService::validate_domain("example.com").await;
-        assert!(!valid, "example.com should not be immediately verified: {}", msg); // Changed to not verified
-        assert!(token.is_some(), "Valid domain should have verification token");
-        
+        assert!(
+            !valid,
+            "example.com should not be immediately verified: {}",
+            msg
+        ); // Changed to not verified
+        assert!(
+            token.is_some(),
+            "Valid domain should have verification token"
+        );
+
         let (valid, msg, token) = DomainValidationService::validate_domain("sub.example.com").await;
-        assert!(!valid, "sub.example.com should not be immediately verified: {}", msg); // Changed to not verified
-        assert!(token.is_some(), "Valid domain should have verification token");
-        
-        let (valid, msg, token) = DomainValidationService::validate_domain("test-domain.co.uk").await;
-        assert!(!valid, "test-domain.co.uk should not be immediately verified: {}", msg); // Changed to not verified
-        assert!(token.is_some(), "Valid domain should have verification token");
-        
+        assert!(
+            !valid,
+            "sub.example.com should not be immediately verified: {}",
+            msg
+        ); // Changed to not verified
+        assert!(
+            token.is_some(),
+            "Valid domain should have verification token"
+        );
+
+        let (valid, msg, token) =
+            DomainValidationService::validate_domain("test-domain.co.uk").await;
+        assert!(
+            !valid,
+            "test-domain.co.uk should not be immediately verified: {}",
+            msg
+        ); // Changed to not verified
+        assert!(
+            token.is_some(),
+            "Valid domain should have verification token"
+        );
+
         // Invalid domains
         let (valid, _, token) = DomainValidationService::validate_domain("").await;
         assert!(!valid, "empty domain should be invalid");
-        assert!(token.is_none(), "Invalid domain should not have verification token");
-        
+        assert!(
+            token.is_none(),
+            "Invalid domain should not have verification token"
+        );
+
         let (valid, _, token) = DomainValidationService::validate_domain("invalid..domain").await;
         assert!(!valid, "double dots should be invalid");
-        assert!(token.is_none(), "Invalid domain should not have verification token");
-        
+        assert!(
+            token.is_none(),
+            "Invalid domain should not have verification token"
+        );
+
         let (valid, _, token) = DomainValidationService::validate_domain(".invalid.domain").await;
         assert!(!valid, "starting with dot should be invalid");
-        assert!(token.is_none(), "Invalid domain should not have verification token");
-        
+        assert!(
+            token.is_none(),
+            "Invalid domain should not have verification token"
+        );
+
         let (valid, _, token) = DomainValidationService::validate_domain("invalid.domain.").await;
         assert!(!valid, "ending with dot should be invalid");
-        assert!(token.is_none(), "Invalid domain should not have verification token");
-        
+        assert!(
+            token.is_none(),
+            "Invalid domain should not have verification token"
+        );
+
         // Test very long domain name
         let long_domain = "a".repeat(300) + ".com";
         let (valid, _, token) = DomainValidationService::validate_domain(&long_domain).await;
         assert!(!valid, "very long domain should be invalid");
-        assert!(token.is_none(), "Invalid domain should not have verification token");
+        assert!(
+            token.is_none(),
+            "Invalid domain should not have verification token"
+        );
     }
 }

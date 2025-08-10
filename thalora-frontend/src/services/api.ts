@@ -94,7 +94,7 @@ export async function shortenUrl(url: string): Promise<ShortenUrlResponse> {
 
     // Log the actual error for debugging
     console.error('Unexpected error in shortenUrl:', error);
-    
+
     // Re-throw other errors with more context
     throw new ThaloraApiError(`An unexpected error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`, 0);
   }
@@ -197,6 +197,47 @@ export async function listDomains(): Promise<DomainEntry[]> {
     }
 
     console.error('Unexpected error in listDomains:', error);
+    throw new ThaloraApiError(`An unexpected error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`, 0);
+  }
+}
+
+/**
+ * Triggers the verification process for a domain
+ */
+export async function verifyDomain(domainId: number): Promise<AddDomainResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/domains/${domainId}/verify`, {
+      method: 'POST',
+    });
+
+    if (!response) {
+      throw new ThaloraApiError('No response received from server', 0);
+    }
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (jsonError) {
+      console.error('Failed to parse JSON response:', jsonError);
+      throw new ThaloraApiError('Invalid response format from server', response.status);
+    }
+
+    if (!response.ok) {
+      const error = data as ApiError;
+      throw new ThaloraApiError(error.error || 'An error occurred while verifying the domain', response.status);
+    }
+
+    return data as AddDomainResponse;
+  } catch (error) {
+    if (error instanceof ThaloraApiError) {
+      throw error;
+    }
+
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new ThaloraApiError('Unable to connect to the server. Please check your connection.', 0);
+    }
+
+    console.error('Unexpected error in verifyDomain:', error);
     throw new ThaloraApiError(`An unexpected error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`, 0);
   }
 }

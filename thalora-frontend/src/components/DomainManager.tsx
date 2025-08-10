@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DomainEntry, addDomain, listDomains, ThaloraApiError } from '../services/api';
+import { DomainEntry, addDomain, listDomains, verifyDomain, ThaloraApiError } from '../services/api';
 import './DomainManager.css';
 
 interface DomainManagerProps {
@@ -13,6 +13,7 @@ const DomainManager: React.FC<DomainManagerProps> = ({ onDomainAdded }) => {
   const [isLoadingDomains, setIsLoadingDomains] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
+  const [verifyingDomainId, setVerifyingDomainId] = useState<number | null>(null);
 
   // Load domains on component mount
   useEffect(() => {
@@ -34,7 +35,7 @@ const DomainManager: React.FC<DomainManagerProps> = ({ onDomainAdded }) => {
 
   const handleAddDomain = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
-    
+
     if (!newDomainName.trim()) {
       setError('Please enter a domain name');
       return;
@@ -48,10 +49,10 @@ const DomainManager: React.FC<DomainManagerProps> = ({ onDomainAdded }) => {
       const response = await addDomain(newDomainName.trim());
       setSuccessMessage(response.verification_status);
       setNewDomainName('');
-      
+
       // Refresh the domains list
       await fetchDomains();
-      
+
       if (onDomainAdded) {
         onDomainAdded();
       }
@@ -60,6 +61,23 @@ const DomainManager: React.FC<DomainManagerProps> = ({ onDomainAdded }) => {
       setError(error instanceof ThaloraApiError ? error.message : 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleVerifyDomain = async (domainId: number): Promise<void> => {
+    setVerifyingDomainId(domainId);
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      const response = await verifyDomain(domainId);
+      setSuccessMessage(response.verification_status);
+      await fetchDomains(); // Refresh the list
+    } catch (error) {
+      console.error('Error verifying domain:', error);
+      setError(error instanceof ThaloraApiError ? error.message : 'An unexpected error occurred during verification');
+    } finally {
+      setVerifyingDomainId(null);
     }
   };
 
@@ -142,7 +160,7 @@ const DomainManager: React.FC<DomainManagerProps> = ({ onDomainAdded }) => {
       {/* Domains List */}
       <div className="domain-manager__list-section">
         <h3 className="domain-manager__list-title">Your Domains</h3>
-        
+
         {isLoadingDomains ? (
           <div className="domain-manager__loading">
             <span className="domain-manager__spinner"></span>
@@ -191,6 +209,20 @@ const DomainManager: React.FC<DomainManagerProps> = ({ onDomainAdded }) => {
                       <strong>Host:</strong> _thalora-verification.{domain.domain_name}<br />
                       <strong>Value:</strong> {domain.verification_token || 'Token not available'}
                     </div>
+                    <button
+                      className="domain-list__verify-btn"
+                      onClick={() => handleVerifyDomain(domain.id)}
+                      disabled={verifyingDomainId === domain.id}
+                    >
+                      {verifyingDomainId === domain.id ? (
+                        <>
+                          <span className="domain-form__spinner"></span>
+                          Verifying...
+                        </>
+                      ) : (
+                        'Verify Now'
+                      )}
+                    </button>
                   </div>
                 )}
               </div>
