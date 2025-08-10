@@ -158,8 +158,8 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin("http://localhost:3000") // Frontend development server
-            .allowed_methods(vec!["GET", "POST"])
-            .allowed_headers(vec!["content-type"])
+            .allowed_methods(vec!["GET", "POST", "OPTIONS"]) // Add OPTIONS for preflight
+            .allowed_headers(vec!["content-type", "accept", "origin", "x-requested-with"])
             .max_age(3600);
 
         App::new()
