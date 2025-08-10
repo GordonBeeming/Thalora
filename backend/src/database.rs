@@ -584,6 +584,49 @@ impl DatabaseService {
         Ok(domains)
     }
 
+    pub async fn get_all_domains(pool: &DatabasePool) -> Result<Vec<DomainEntry>> {
+        let mut conn = pool
+            .get()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
+
+        let database_name = Self::get_database_name();
+        let query = format!(
+            "USE [{}]; 
+            SELECT id, user_id, domain_name, is_verified, verification_token, created_at, updated_at 
+            FROM domains 
+            ORDER BY created_at DESC",
+            database_name
+        );
+
+        let query = tiberius::Query::new(&query);
+        let stream = query.query(&mut *conn).await?;
+        let rows = stream.into_first_result().await?;
+
+        let mut domains = Vec::new();
+        for row in rows {
+            let id: i64 = row.get(0).unwrap();
+            let user_id: Option<i64> = row.get(1);
+            let domain_name: &str = row.get(2).unwrap();
+            let is_verified: bool = row.get(3).unwrap();
+            let verification_token: Option<&str> = row.get(4);
+            let created_at: chrono::DateTime<chrono::Utc> = row.get(5).unwrap();
+            let updated_at: chrono::DateTime<chrono::Utc> = row.get(6).unwrap();
+
+            domains.push(DomainEntry {
+                id,
+                user_id,
+                domain_name: domain_name.to_string(),
+                is_verified,
+                verification_token: verification_token.map(|s| s.to_string()),
+                created_at,
+                updated_at,
+            });
+        }
+
+        Ok(domains)
+    }
+
     pub async fn update_domain_verification(
         pool: &DatabasePool,
         domain_name: &str,

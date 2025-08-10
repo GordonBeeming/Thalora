@@ -352,9 +352,9 @@ async fn add_domain(
 
 // GET /domains endpoint - list all domains
 async fn list_domains(db_pool: AppDatabasePool) -> Result<HttpResponse> {
-    match DatabaseService::get_verified_domains(&db_pool).await {
+    match DatabaseService::get_all_domains(&db_pool).await {
         Ok(domains) => {
-            info!("Retrieved {} verified domains", domains.len());
+            info!("Retrieved {} domains", domains.len());
             Ok(HttpResponse::Ok().json(domains))
         }
         Err(e) => {
