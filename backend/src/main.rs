@@ -89,7 +89,14 @@ async fn shorten_url(
     let connection_info = http_req.connection_info();
     let scheme = connection_info.scheme();
     let host = connection_info.host();
-    let base_url = format!("{}://{}", scheme, host);
+    
+    // Fallback to localhost:8080 if connection info is not reliable
+    let base_url = if host.is_empty() || scheme.is_empty() {
+        info!("Connection info not reliable (scheme: '{}', host: '{}'), falling back to localhost:8080", scheme, host);
+        "http://localhost:8080".to_string()
+    } else {
+        format!("{}://{}", scheme, host)
+    };
 
     // Return the shortened URL
     Ok(HttpResponse::Ok().json(ShortenResponse {
