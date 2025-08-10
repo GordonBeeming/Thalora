@@ -23,6 +23,7 @@ pub struct DomainEntry {
     pub user_id: Option<i64>,
     pub domain_name: String,
     pub is_verified: bool,
+    pub verification_token: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
@@ -33,12 +34,16 @@ pub struct DatabaseConfig {
     pub max_connections: u32,
     pub min_connections: u32,
     pub encryption_enabled: bool,
+    pub database_name: String,
 }
 
 impl DatabaseConfig {
     pub fn from_env() -> Result<Self> {
         let base_connection_string = env::var("DATABASE_URL")
             .map_err(|_| anyhow::anyhow!("DATABASE_URL environment variable not set"))?;
+
+        // Extract database name from connection string
+        let database_name = Self::extract_database_name(&base_connection_string)?;
 
         // Parse environment variables for pool configuration
         let max_connections = env::var("DB_MAX_CONNECTIONS")
@@ -105,7 +110,23 @@ impl DatabaseConfig {
             max_connections,
             min_connections,
             encryption_enabled,
+            database_name,
         })
+    }
+
+    fn extract_database_name(connection_string: &str) -> Result<String> {
+        // Parse the connection string to find the Database parameter
+        for part in connection_string.split(';') {
+            let part = part.trim();
+            if part.to_lowercase().starts_with("database=") {
+                let db_name = part.split('=').nth(1).unwrap_or("").trim();
+                if db_name.is_empty() {
+                    return Err(anyhow::anyhow!("Empty database name in connection string"));
+                }
+                return Ok(db_name.to_string());
+            }
+        }
+        Err(anyhow::anyhow!("No Database parameter found in connection string"))
     }
 }
 
@@ -160,7 +181,7 @@ pub async fn create_connection_pool(config: &DatabaseConfig) -> Result<DatabaseP
 pub struct DatabaseService;
 
 impl DatabaseService {
-    pub async fn initialize_database(pool: &DatabasePool) -> Result<()> {
+    pub async fn initialize_database(pool: &DatabasePool, config: &DatabaseConfig) -> Result<()> {
         info!("Initializing database schema...");
 
         let mut conn = pool
@@ -168,14 +189,13 @@ impl DatabaseService {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
 
-        // Check if TaloraDB database exists, create if not
-        let db_check_query = "
-            SELECT COUNT(*) as db_exists 
-            FROM sys.databases 
-            WHERE name = 'TaloraDB'
-        ";
+        // Check if database exists, create if not
+        let db_check_query = format!(
+            "SELECT COUNT(*) as db_exists FROM sys.databases WHERE name = '{}'",
+            config.database_name
+        );
 
-        let query = tiberius::Query::new(db_check_query);
+        let query = tiberius::Query::new(&db_check_query);
         let stream = query.query(&mut *conn).await?;
         let row = stream.into_first_result().await?;
 
@@ -187,18 +207,18 @@ impl DatabaseService {
         };
 
         if !db_exists {
-            info!("Creating TaloraDB database...");
-            let create_db_query = "CREATE DATABASE TaloraDB";
-            let query = tiberius::Query::new(create_db_query);
+            info!("Creating database: {}", config.database_name);
+            let create_db_query = format!("CREATE DATABASE [{}]", config.database_name);
+            let query = tiberius::Query::new(&create_db_query);
             query.execute(&mut *conn).await?;
-            info!("TaloraDB database created successfully");
+            info!("Database '{}' created successfully", config.database_name);
         } else {
-            info!("TaloraDB database already exists");
+            info!("Database '{}' already exists", config.database_name);
         }
 
-        // Switch to TaloraDB database
-        let use_db_query = "USE TaloraDB";
-        let query = tiberius::Query::new(use_db_query);
+        // Switch to the target database
+        let use_db_query = format!("USE [{}]", config.database_name);
+        let query = tiberius::Query::new(&use_db_query);
         query.execute(&mut *conn).await?;
 
         // Check if urls table exists, create if not
@@ -240,32 +260,77 @@ impl DatabaseService {
             info!("urls table already exists");
         }
 
-        // Check if domains table exists, create if not
-        let domains_check_query = "
-            SELECT COUNT(*) as table_exists 
-            FROM INFORMATION_SCHEMA.TABLES 
-            WHERE TABLE_NAME = 'domains'
-        ";
+        // Run pending migrations
+        Self::run_migrations(&mut *conn, &config.database_name).await?;
 
-        let query = tiberius::Query::new(domains_check_query);
-        let stream = query.query(&mut *conn).await?;
+        info!("Database initialization completed");
+        Ok(())
+    }
+
+    async fn run_migrations(conn: &mut tiberius::Client<tokio_util::compat::Compat<tokio::net::TcpStream>>, database_name: &str) -> Result<()> {
+        info!("Running database migrations...");
+
+        // Create migrations tracking table if it doesn't exist
+        let create_migrations_table = format!(
+            "USE [{}]; 
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'schema_migrations')
+            BEGIN
+                CREATE TABLE schema_migrations (
+                    version VARCHAR(255) PRIMARY KEY,
+                    applied_at DATETIME2 DEFAULT GETUTCDATE()
+                );
+            END",
+            database_name
+        );
+        
+        let query = tiberius::Query::new(&create_migrations_table);
+        query.execute(conn).await?;
+
+        // For now, manually run the domains migration
+        // In a more complete implementation, this would read migration files from the filesystem
+        Self::run_domains_migration(conn, database_name).await?;
+
+        info!("Database migrations completed");
+        Ok(())
+    }
+
+    async fn run_domains_migration(conn: &mut tiberius::Client<tokio_util::compat::Compat<tokio::net::TcpStream>>, database_name: &str) -> Result<()> {
+        // Check if migration was already applied
+        let check_migration = format!(
+            "USE [{}]; SELECT COUNT(*) FROM schema_migrations WHERE version = '001_add_domains_table'",
+            database_name
+        );
+        
+        let query = tiberius::Query::new(&check_migration);
+        let stream = query.query(conn).await?;
         let row = stream.into_first_result().await?;
 
-        let domains_table_exists = if let Some(row) = row.into_iter().next() {
+        let migration_exists = if let Some(row) = row.into_iter().next() {
             let count: i32 = row.get(0).unwrap_or(0);
             count > 0
         } else {
             false
         };
 
-        if !domains_table_exists {
-            info!("Creating domains table...");
-            let create_domains_table_query = "
+        if migration_exists {
+            info!("Migration 001_add_domains_table already applied");
+            return Ok(());
+        }
+
+        // Apply the domains migration
+        info!("Applying migration: 001_add_domains_table");
+        
+        let migration_sql = format!(
+            "USE [{}]; 
+            -- Create domains table for storing custom domains
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'domains')
+            BEGIN
                 CREATE TABLE domains (
                     id BIGINT IDENTITY(1,1) PRIMARY KEY,
                     user_id BIGINT NULL,
                     domain_name NVARCHAR(255) NOT NULL UNIQUE,
                     is_verified BIT NOT NULL DEFAULT 0,
+                    verification_token NVARCHAR(255) NULL,
                     created_at DATETIME2 DEFAULT GETUTCDATE(),
                     updated_at DATETIME2 DEFAULT GETUTCDATE()
                 );
@@ -273,16 +338,35 @@ impl DatabaseService {
                 CREATE INDEX IX_domains_domain_name ON domains(domain_name);
                 CREATE INDEX IX_domains_user_id ON domains(user_id);
                 CREATE INDEX IX_domains_verified ON domains(is_verified);
-            ";
-            let query = tiberius::Query::new(create_domains_table_query);
-            query.execute(&mut *conn).await?;
-            info!("domains table and indexes created successfully");
-        } else {
-            info!("domains table already exists");
-        }
+                CREATE INDEX IX_domains_verification_token ON domains(verification_token);
+            END;
+            
+            -- Record that this migration was applied
+            INSERT INTO schema_migrations (version) VALUES ('001_add_domains_table');",
+            database_name
+        );
 
-        info!("Database initialization completed");
+        let query = tiberius::Query::new(&migration_sql);
+        query.execute(conn).await?;
+        
+        info!("Migration 001_add_domains_table applied successfully");
         Ok(())
+    }
+
+    fn get_database_name() -> String {
+        // Try to get database name from environment, fallback to extracting from DATABASE_URL
+        if let Ok(db_name) = std::env::var("DATABASE_NAME") {
+            return db_name;
+        }
+        
+        if let Ok(_database_url) = std::env::var("DATABASE_URL") {
+            if let Ok(config) = DatabaseConfig::from_env() {
+                return config.database_name;
+            }
+        }
+        
+        // Fallback to default
+        "TaloraDB".to_string()
     }
 
     pub async fn insert_url(
@@ -295,14 +379,16 @@ impl DatabaseService {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
 
-        let query = "
-            USE TaloraDB;
+        let database_name = Self::get_database_name();
+        let query = format!(
+            "USE [{}];
             INSERT INTO urls (original_url, shortened_url) 
             OUTPUT INSERTED.id
-            VALUES (@P1, @P2)
-        ";
+            VALUES (@P1, @P2)",
+            database_name
+        );
 
-        let mut query = tiberius::Query::new(query);
+        let mut query = tiberius::Query::new(&query);
         query.bind(original_url);
         query.bind(shortened_url);
 
@@ -327,9 +413,10 @@ impl DatabaseService {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
 
-        let query = "USE TaloraDB; SELECT original_url FROM urls WHERE shortened_url = @P1";
+        let database_name = Self::get_database_name();
+        let query = format!("USE [{}]; SELECT original_url FROM urls WHERE shortened_url = @P1", database_name);
 
-        let mut query = tiberius::Query::new(query);
+        let mut query = tiberius::Query::new(&query);
         query.bind(shortened_url);
 
         let stream = query.query(&mut *conn).await?;
@@ -349,9 +436,10 @@ impl DatabaseService {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
 
-        let query = "USE TaloraDB; SELECT COUNT(*) FROM urls WHERE shortened_url = @P1";
+        let database_name = Self::get_database_name();
+        let query = format!("USE [{}]; SELECT COUNT(*) FROM urls WHERE shortened_url = @P1", database_name);
 
-        let mut query = tiberius::Query::new(query);
+        let mut query = tiberius::Query::new(&query);
         query.bind(shortened_url);
 
         let stream = query.query(&mut *conn).await?;
@@ -371,23 +459,27 @@ impl DatabaseService {
         domain_name: &str,
         user_id: Option<i64>,
         is_verified: bool,
+        verification_token: Option<String>,
     ) -> Result<i64> {
         let mut conn = pool
             .get()
             .await
             .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
 
-        let query = "
-            USE TaloraDB;
-            INSERT INTO domains (domain_name, user_id, is_verified) 
+        let database_name = Self::get_database_name();
+        let query = format!(
+            "USE [{}];
+            INSERT INTO domains (domain_name, user_id, is_verified, verification_token) 
             OUTPUT INSERTED.id
-            VALUES (@P1, @P2, @P3)
-        ";
+            VALUES (@P1, @P2, @P3, @P4)",
+            database_name
+        );
 
-        let mut query = tiberius::Query::new(query);
+        let mut query = tiberius::Query::new(&query);
         query.bind(domain_name);
         query.bind(user_id);
         query.bind(is_verified);
+        query.bind(verification_token);
 
         let stream = query.query(&mut *conn).await?;
         let row = stream.into_first_result().await?;
@@ -410,14 +502,16 @@ impl DatabaseService {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
 
-        let query = "
-            USE TaloraDB; 
-            SELECT id, user_id, domain_name, is_verified, created_at, updated_at 
+        let database_name = Self::get_database_name();
+        let query = format!(
+            "USE [{}]; 
+            SELECT id, user_id, domain_name, is_verified, verification_token, created_at, updated_at 
             FROM domains 
-            WHERE domain_name = @P1
-        ";
+            WHERE domain_name = @P1",
+            database_name
+        );
 
-        let mut query = tiberius::Query::new(query);
+        let mut query = tiberius::Query::new(&query);
         query.bind(domain_name);
 
         let stream = query.query(&mut *conn).await?;
@@ -428,14 +522,16 @@ impl DatabaseService {
             let user_id: Option<i64> = row.get(1);
             let domain_name: &str = row.get(2).unwrap();
             let is_verified: bool = row.get(3).unwrap();
-            let created_at: chrono::DateTime<chrono::Utc> = row.get(4).unwrap();
-            let updated_at: chrono::DateTime<chrono::Utc> = row.get(5).unwrap();
+            let verification_token: Option<&str> = row.get(4);
+            let created_at: chrono::DateTime<chrono::Utc> = row.get(5).unwrap();
+            let updated_at: chrono::DateTime<chrono::Utc> = row.get(6).unwrap();
 
             Ok(Some(DomainEntry {
                 id,
                 user_id,
                 domain_name: domain_name.to_string(),
                 is_verified,
+                verification_token: verification_token.map(|s| s.to_string()),
                 created_at,
                 updated_at,
             }))
@@ -450,15 +546,17 @@ impl DatabaseService {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
 
-        let query = "
-            USE TaloraDB; 
-            SELECT id, user_id, domain_name, is_verified, created_at, updated_at 
+        let database_name = Self::get_database_name();
+        let query = format!(
+            "USE [{}]; 
+            SELECT id, user_id, domain_name, is_verified, verification_token, created_at, updated_at 
             FROM domains 
             WHERE is_verified = 1
-            ORDER BY created_at DESC
-        ";
+            ORDER BY created_at DESC",
+            database_name
+        );
 
-        let query = tiberius::Query::new(query);
+        let query = tiberius::Query::new(&query);
         let stream = query.query(&mut *conn).await?;
         let rows = stream.into_first_result().await?;
 
@@ -468,14 +566,16 @@ impl DatabaseService {
             let user_id: Option<i64> = row.get(1);
             let domain_name: &str = row.get(2).unwrap();
             let is_verified: bool = row.get(3).unwrap();
-            let created_at: chrono::DateTime<chrono::Utc> = row.get(4).unwrap();
-            let updated_at: chrono::DateTime<chrono::Utc> = row.get(5).unwrap();
+            let verification_token: Option<&str> = row.get(4);
+            let created_at: chrono::DateTime<chrono::Utc> = row.get(5).unwrap();
+            let updated_at: chrono::DateTime<chrono::Utc> = row.get(6).unwrap();
 
             domains.push(DomainEntry {
                 id,
                 user_id,
                 domain_name: domain_name.to_string(),
                 is_verified,
+                verification_token: verification_token.map(|s| s.to_string()),
                 created_at,
                 updated_at,
             });
@@ -494,14 +594,16 @@ impl DatabaseService {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
 
-        let query = "
-            USE TaloraDB;
+        let database_name = Self::get_database_name();
+        let query = format!(
+            "USE [{}];
             UPDATE domains 
             SET is_verified = @P2, updated_at = GETUTCDATE()
-            WHERE domain_name = @P1
-        ";
+            WHERE domain_name = @P1",
+            database_name
+        );
 
-        let mut query = tiberius::Query::new(query);
+        let mut query = tiberius::Query::new(&query);
         query.bind(domain_name);
         query.bind(is_verified);
 

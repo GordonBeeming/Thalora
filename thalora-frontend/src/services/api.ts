@@ -16,6 +16,27 @@ export interface ApiError {
   error: string;
 }
 
+export interface DomainEntry {
+  id: number;
+  user_id?: number;
+  domain_name: string;
+  is_verified: boolean;
+  verification_token?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AddDomainRequest {
+  domain_name: string;
+}
+
+export interface AddDomainResponse {
+  id: number;
+  domain_name: string;
+  is_verified: boolean;
+  verification_status: string;
+}
+
 // Configuration
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
@@ -91,5 +112,91 @@ export async function checkHealth(): Promise<boolean> {
     return response.ok;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Adds a new domain for custom URL shortening
+ */
+export async function addDomain(domainName: string): Promise<AddDomainResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/domains`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ domain_name: domainName } as AddDomainRequest),
+    });
+
+    if (!response) {
+      throw new ThaloriApiError('No response received from server', 0);
+    }
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (jsonError) {
+      console.error('Failed to parse JSON response:', jsonError);
+      throw new ThaloriApiError('Invalid response format from server', response.status);
+    }
+
+    if (!response.ok) {
+      const error = data as ApiError;
+      throw new ThaloriApiError(error.error || 'An error occurred while adding the domain', response.status);
+    }
+
+    return data as AddDomainResponse;
+  } catch (error) {
+    if (error instanceof ThaloriApiError) {
+      throw error;
+    }
+
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new ThaloriApiError('Unable to connect to the server. Please check your connection.', 0);
+    }
+
+    console.error('Unexpected error in addDomain:', error);
+    throw new ThaloriApiError(`An unexpected error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`, 0);
+  }
+}
+
+/**
+ * Gets list of verified domains
+ */
+export async function listDomains(): Promise<DomainEntry[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/domains`, {
+      method: 'GET',
+    });
+
+    if (!response) {
+      throw new ThaloriApiError('No response received from server', 0);
+    }
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (jsonError) {
+      console.error('Failed to parse JSON response:', jsonError);
+      throw new ThaloriApiError('Invalid response format from server', response.status);
+    }
+
+    if (!response.ok) {
+      const error = data as ApiError;
+      throw new ThaloriApiError(error.error || 'An error occurred while fetching domains', response.status);
+    }
+
+    return data as DomainEntry[];
+  } catch (error) {
+    if (error instanceof ThaloriApiError) {
+      throw error;
+    }
+
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new ThaloriApiError('Unable to connect to the server. Please check your connection.', 0);
+    }
+
+    console.error('Unexpected error in listDomains:', error);
+    throw new ThaloriApiError(`An unexpected error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`, 0);
   }
 }
