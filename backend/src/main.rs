@@ -1,5 +1,5 @@
 use actix_cors::Cors;
-use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result};
+use actix_web::{middleware::Logger, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use log::info;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
@@ -51,6 +51,7 @@ fn is_valid_url(url_str: &str) -> bool {
 // POST /shorten endpoint
 async fn shorten_url(
     req: web::Json<ShortenRequest>,
+    http_req: HttpRequest,
     storage: web::Data<UrlStorage>,
 ) -> Result<HttpResponse> {
     let original_url = req.url.trim();
@@ -84,9 +85,15 @@ async fn shorten_url(
 
     info!("Created short URL {short_id} for {original_url}");
 
+    // Build the base URL from the current request context
+    let connection_info = http_req.connection_info();
+    let scheme = connection_info.scheme();
+    let host = connection_info.host();
+    let base_url = format!("{}://{}", scheme, host);
+
     // Return the shortened URL
     Ok(HttpResponse::Ok().json(ShortenResponse {
-        short_url: format!("http://localhost:8080/shortened-url/{short_id}"),
+        short_url: format!("{}/shortened-url/{}", base_url, short_id),
         original_url: original_url.to_string(),
     }))
 }
