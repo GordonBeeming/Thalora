@@ -113,7 +113,7 @@ pub async fn create_connection_pool(config: &DatabaseConfig) -> Result<DatabaseP
         tiberius_config.encryption(tiberius::EncryptionLevel::NotSupported);
     }
 
-    // Create connection manager with the MODIFIED config
+    // Create connection manager with the config
     let connection_manager = ConnectionManager::new(tiberius_config);
 
     // Build the connection pool
