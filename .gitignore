@@ -13,6 +13,11 @@ node_modules/
 thalora-frontend/build/
 */build/
 
+# Rust specific
+backend/target/
+**/target/
+Cargo.lock
+
 # Environment variables
 .env
 .env.local
