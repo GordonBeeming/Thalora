@@ -1,12 +1,13 @@
 use actix_cors::Cors;
 use actix_web::{middleware::Logger, web, App, HttpRequest, HttpResponse, HttpServer, Result};
-use log::info;
+use log::{error, info, warn};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use url::Url;
+
+mod database;
+use database::{create_connection_pool, DatabaseConfig, DatabasePool, DatabaseService};
 
 // Data structures for request/response
 #[derive(Deserialize)]
@@ -25,8 +26,8 @@ struct ErrorResponse {
     error: String,
 }
 
-// In-memory storage for URL mappings
-type UrlStorage = Arc<Mutex<HashMap<String, String>>>;
+// Database service for URL mappings - now uses connection pool
+type AppDatabasePool = web::Data<DatabasePool>;
 
 // Generate a random shortened URL identifier
 fn generate_short_id() -> String {
@@ -52,7 +53,7 @@ fn is_valid_url(url_str: &str) -> bool {
 async fn shorten_url(
     req: web::Json<ShortenRequest>,
     http_req: HttpRequest,
-    storage: web::Data<UrlStorage>,
+    db_pool: AppDatabasePool,
 ) -> Result<HttpResponse> {
     let original_url = req.url.trim();
 
@@ -74,16 +75,40 @@ async fn shorten_url(
         }));
     }
 
-    // Generate unique short ID
-    let short_id = generate_short_id();
+    // Generate unique short ID, ensuring it's not already used
+    let short_id = loop {
+        let candidate = generate_short_id();
+        
+        // Check if this ID already exists in the database using the pool
+        match DatabaseService::url_exists(&db_pool, &candidate).await {
+            Ok(exists) => {
+                if !exists {
+                    break candidate;
+                }
+                // If it exists, continue the loop to generate a new one
+                warn!("Generated short ID {} already exists, trying again", candidate);
+            }
+            Err(e) => {
+                error!("Database error checking URL existence: {}", e);
+                return Ok(HttpResponse::InternalServerError().json(ErrorResponse {
+                    error: "Database error".to_string(),
+                }));
+            }
+        }
+    };
 
-    // Store the mapping
-    {
-        let mut storage = storage.lock().unwrap();
-        storage.insert(short_id.clone(), original_url.to_string());
+    // Store the mapping in the database using the pool
+    match DatabaseService::insert_url(&db_pool, original_url, &short_id).await {
+        Ok(id) => {
+            info!("Created short URL {} for {} with database ID {}", short_id, original_url, id);
+        }
+        Err(e) => {
+            error!("Failed to store URL in database: {}", e);
+            return Ok(HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Failed to store URL".to_string(),
+            }));
+        }
     }
-
-    info!("Created short URL {short_id} for {original_url}");
 
     // Build the base URL from the current request context
     let connection_info = http_req.connection_info();
@@ -108,16 +133,21 @@ async fn shorten_url(
 // GET /shortened-url/{id} endpoint
 async fn redirect_url(
     path: web::Path<String>,
-    storage: web::Data<UrlStorage>,
+    db_pool: AppDatabasePool,
 ) -> Result<HttpResponse> {
     let short_id = path.into_inner();
 
     info!("Received redirect request for short ID: {short_id}");
 
-    // Look up the original URL
-    let original_url = {
-        let storage = storage.lock().unwrap();
-        storage.get(&short_id).cloned()
+    // Look up the original URL in the database using the pool
+    let original_url = match DatabaseService::get_original_url(&db_pool, &short_id).await {
+        Ok(url) => url,
+        Err(e) => {
+            error!("Database error retrieving URL for {}: {}", short_id, e);
+            return Ok(HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Database error".to_string(),
+            }));
+        }
     };
 
     match original_url {
@@ -146,13 +176,60 @@ async fn health_check() -> Result<HttpResponse> {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // Load environment variables from .env file if it exists
+    dotenv::dotenv().ok();
+
     // Initialize logger
     env_logger::init();
 
     info!("Starting Thalora URL Shortener Backend");
 
-    // Create shared storage
-    let storage: UrlStorage = Arc::new(Mutex::new(HashMap::new()));
+    // Initialize database configuration
+    let db_config = match DatabaseConfig::from_env() {
+        Ok(config) => config,
+        Err(e) => {
+            error!("Failed to load database configuration: {}", e);
+            error!("Make sure DATABASE_URL is set in environment or .env file");
+            error!("Example: DATABASE_URL=Server=localhost,1433;Database=master;User=sa;Password=YourPassword;TrustServerCertificate=true;");
+            error!("To set up a local SQL Server database, run: ./scripts/setup-dev-db.sh");
+            std::process::exit(1);
+        }
+    };
+
+    // Create database connection pool
+    let db_pool = match create_connection_pool(&db_config).await {
+        Ok(pool) => pool,
+        Err(e) => {
+            error!("Failed to create database connection pool: {}", e);
+            error!("Connection string: {}", db_config.connection_string);
+            error!("");
+            error!("To fix this issue:");
+            error!("1. If using Docker, run: ./scripts/setup-dev-db.sh");
+            error!("2. Or start SQL Server container: docker compose up -d sqlserver");
+            error!("3. Wait for SQL Server to be ready (about 30-60 seconds)");
+            error!("4. Then try running the backend again: cargo run");
+            std::process::exit(1);
+        }
+    };
+
+    // Initialize database schema (create database and tables if they don't exist)
+    if let Err(e) = DatabaseService::initialize_database(&db_pool).await {
+        error!("Failed to initialize database: {}", e);
+        error!("Make sure SQL Server is running and the user has sufficient privileges");
+        std::process::exit(1);
+    }
+
+    info!("Database connection pool established successfully");
+
+    // Get server configuration from environment or use defaults
+    let host = std::env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let port = std::env::var("SERVER_PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(8080);
+    
+    let bind_address = format!("{}:{}", host, port);
+    info!("Server will bind to: {}", bind_address);
 
     // Start HTTP server
     HttpServer::new(move || {
@@ -163,14 +240,14 @@ async fn main() -> std::io::Result<()> {
             .max_age(3600);
 
         App::new()
-            .app_data(web::Data::new(storage.clone()))
+            .app_data(web::Data::new(db_pool.clone()))
             .wrap(cors)
             .wrap(Logger::default())
             .route("/health", web::get().to(health_check))
             .route("/shorten", web::post().to(shorten_url))
             .route("/shortened-url/{id}", web::get().to(redirect_url))
     })
-    .bind("127.0.0.1:8080")?
+    .bind(&bind_address)?
     .run()
     .await
 }

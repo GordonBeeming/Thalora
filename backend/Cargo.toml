@@ -13,6 +13,21 @@ env_logger = "0.10"
 log = "0.4"
 url = "2.5"
 rand = "0.8"
+# Database dependencies
+tiberius = { version = "0.12", features = ["sql-browser-tokio"] }
+tokio-util = { version = "0.7", features = ["compat"] }
+# Connection pooling
+bb8 = "0.9"
+bb8-tiberius = "0.16"
+# Configuration management
+dotenv = "0.15"
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+# Date handling
+chrono = { version = "0.4", features = ["serde"] }
+# Regex for connection string processing
+regex = "1.10"
 
 [dev-dependencies]
 actix-rt = "2.9"
