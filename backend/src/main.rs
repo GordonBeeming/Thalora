@@ -225,6 +225,8 @@ async fn main() -> std::io::Result<()> {
         Err(e) => {
             error!("Failed to load database configuration: {}", e);
             error!("Make sure DATABASE_URL is set in environment or .env file");
+            error!("Example: DATABASE_URL=Server=localhost,1433;Database=master;User=sa;Password=YourPassword;TrustServerCertificate=true;");
+            error!("To set up a local SQL Server database, run: ./scripts/setup-dev-db.sh");
             std::process::exit(1);
         }
     };
@@ -235,12 +237,22 @@ async fn main() -> std::io::Result<()> {
         Err(e) => {
             error!("Failed to connect to database: {}", e);
             error!("Make sure SQL Server is running and accessible");
+            error!("Connection string: {}", db_config.connection_string);
+            error!("To set up a local SQL Server database, run: ./scripts/setup-dev-db.sh");
             std::process::exit(1);
         }
     };
 
     // Create database service
-    let db_service = DatabaseService::new(db_client);
+    let mut db_service = DatabaseService::new(db_client);
+    
+    // Initialize database schema (create database and tables if they don't exist)
+    if let Err(e) = db_service.initialize_database().await {
+        error!("Failed to initialize database: {}", e);
+        error!("Make sure SQL Server is running and the user has sufficient privileges");
+        std::process::exit(1);
+    }
+    
     let db_pool: DatabasePool = Arc::new(Mutex::new(db_service));
 
     info!("Database connection established successfully");

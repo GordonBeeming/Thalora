@@ -38,7 +38,16 @@ pub async fn create_connection(config: &DatabaseConfig) -> Result<DatabaseClient
     
     let config = Config::from_ado_string(&config.connection_string)?;
     let tcp = TcpStream::connect(config.get_addr()).await?;
-    let client = Client::connect(config, tcp.compat_write()).await?;
+    let mut client = Client::connect(config, tcp.compat_write()).await?;
+    
+    // Test the connection with a simple query to ensure database is ready
+    info!("Testing database connection...");
+    let query = tiberius::Query::new("SELECT 1 as test");
+    let stream = query.query(&mut client).await
+        .map_err(|e| anyhow::anyhow!("Database connection test failed: {}", e))?;
+    
+    // Consume the stream to complete the query
+    let _rows = stream.into_first_result().await?;
     
     info!("Successfully connected to SQL Server database");
     Ok(client)
@@ -51,6 +60,85 @@ pub struct DatabaseService {
 impl DatabaseService {
     pub fn new(client: DatabaseClient) -> Self {
         Self { client }
+    }
+
+    pub async fn initialize_database(&mut self) -> Result<()> {
+        info!("Initializing database schema...");
+        
+        // Check if TaloraDB database exists, create if not
+        let db_check_query = "
+            SELECT COUNT(*) as db_exists 
+            FROM sys.databases 
+            WHERE name = 'TaloraDB'
+        ";
+        
+        let query = tiberius::Query::new(db_check_query);
+        let stream = query.query(&mut self.client).await?;
+        let row = stream.into_first_result().await?;
+        
+        let db_exists = if let Some(row) = row.into_iter().next() {
+            let count: i32 = row.get(0).unwrap_or(0);
+            count > 0
+        } else {
+            false
+        };
+        
+        if !db_exists {
+            info!("Creating TaloraDB database...");
+            let create_db_query = "CREATE DATABASE TaloraDB";
+            let query = tiberius::Query::new(create_db_query);
+            query.execute(&mut self.client).await?;
+            info!("TaloraDB database created successfully");
+        } else {
+            info!("TaloraDB database already exists");
+        }
+        
+        // Switch to TaloraDB database
+        let use_db_query = "USE TaloraDB";
+        let query = tiberius::Query::new(use_db_query);
+        query.execute(&mut self.client).await?;
+        
+        // Check if urls table exists, create if not
+        let table_check_query = "
+            SELECT COUNT(*) as table_exists 
+            FROM INFORMATION_SCHEMA.TABLES 
+            WHERE TABLE_NAME = 'urls'
+        ";
+        
+        let query = tiberius::Query::new(table_check_query);
+        let stream = query.query(&mut self.client).await?;
+        let row = stream.into_first_result().await?;
+        
+        let table_exists = if let Some(row) = row.into_iter().next() {
+            let count: i32 = row.get(0).unwrap_or(0);
+            count > 0
+        } else {
+            false
+        };
+        
+        if !table_exists {
+            info!("Creating urls table...");
+            let create_table_query = "
+                CREATE TABLE urls (
+                    id BIGINT IDENTITY(1,1) PRIMARY KEY,
+                    original_url NVARCHAR(2048) NOT NULL,
+                    shortened_url NVARCHAR(255) NOT NULL UNIQUE,
+                    created_at DATETIME2 DEFAULT GETUTCDATE(),
+                    updated_at DATETIME2 DEFAULT GETUTCDATE()
+                );
+                
+                CREATE INDEX IX_urls_shortened_url ON urls(shortened_url);
+                CREATE INDEX IX_urls_created_at ON urls(created_at);
+            ";
+            let query = tiberius::Query::new(create_table_query);
+            query.execute(&mut self.client).await?;
+            info!("urls table and indexes created successfully");
+        } else {
+            info!("urls table already exists");
+        }
+        
+        info!("Database initialization completed");
+        Ok(())
     }
 
     pub async fn insert_url(&mut self, original_url: &str, shortened_url: &str) -> Result<i64> {
