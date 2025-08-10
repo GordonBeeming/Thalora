@@ -34,7 +34,6 @@ pub struct DatabaseConfig {
     pub max_connections: u32,
     pub min_connections: u32,
     pub encryption_enabled: bool,
-    pub database_name: String,
 }
 
 impl DatabaseConfig {
@@ -42,8 +41,8 @@ impl DatabaseConfig {
         let base_connection_string = env::var("DATABASE_URL")
             .map_err(|_| anyhow::anyhow!("DATABASE_URL environment variable not set"))?;
 
-        // Extract database name from connection string
-        let database_name = Self::extract_database_name(&base_connection_string)?;
+        // Validate connection string has database parameter
+        Self::validate_database_name(&base_connection_string)?;
 
         // Parse environment variables for pool configuration
         let max_connections = env::var("DB_MAX_CONNECTIONS")
@@ -110,11 +109,10 @@ impl DatabaseConfig {
             max_connections,
             min_connections,
             encryption_enabled,
-            database_name,
         })
     }
 
-    fn extract_database_name(connection_string: &str) -> Result<String> {
+    fn validate_database_name(connection_string: &str) -> Result<()> {
         // Parse the connection string to find the Database parameter
         for part in connection_string.split(';') {
             let part = part.trim();
@@ -123,7 +121,7 @@ impl DatabaseConfig {
                 if db_name.is_empty() {
                     return Err(anyhow::anyhow!("Empty database name in connection string"));
                 }
-                return Ok(db_name.to_string());
+                return Ok(());
             }
         }
         Err(anyhow::anyhow!("No Database parameter found in connection string. Connection string must include Database=<database_name>"))
@@ -459,29 +457,6 @@ impl DatabaseService {
         }
 
         Ok(domains)
-    }
-
-    pub async fn update_domain_verification(
-        pool: &DatabasePool,
-        domain_name: &str,
-        is_verified: bool,
-    ) -> Result<bool> {
-        let mut conn = pool
-            .get()
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
-
-        let query = "
-            UPDATE domains 
-            SET is_verified = @P2, updated_at = GETUTCDATE()
-            WHERE domain_name = @P1";
-
-        let mut query = tiberius::Query::new(query);
-        query.bind(domain_name);
-        query.bind(is_verified);
-
-        let result = query.execute(&mut *conn).await?;
-        Ok(result.rows_affected().len() > 0)
     }
 
     pub async fn update_domain_verification_by_id(
