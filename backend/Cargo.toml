@@ -13,3 +13,6 @@ log = "0.4"
 url = "2.5"
 uuid = { version = "1.6", features = ["v4"] }
 rand = "0.8"
+
+[dev-dependencies]
+actix-rt = "2.9"

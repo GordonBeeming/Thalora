@@ -39,6 +39,12 @@
   width: 100%;
 }
 
+.home__error {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
 .home__loading {
   display: flex;
   flex-direction: column;

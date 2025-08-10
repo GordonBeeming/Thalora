@@ -3,34 +3,32 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import URLForm from '../components/URLForm';
 import URLDisplay from '../components/URLDisplay';
+import { shortenUrl, ThaloriApiError } from '../services/api';
 import './Home.css';
 
 const Home: React.FC = () => {
   const [shortenedUrl, setShortenedUrl] = useState<string>('');
   const [originalUrl, setOriginalUrl] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
-
-  // Mock URL shortening function - in real app this would call backend API
-  const generateMockShortenedUrl = (url: string): string => {
-    // Generate a random short ID
-    const shortId = Math.random().toString(36).substring(2, 8);
-    return `https://thalora.co/${shortId}`;
-  };
+  const [error, setError] = useState<string>('');
 
   const handleUrlSubmit = async (url: string): Promise<void> => {
     setIsLoading(true);
+    setError('');
     setOriginalUrl(url);
+    setShortenedUrl(''); // Clear previous result
     
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock the shortened URL generation
-      const shortened = generateMockShortenedUrl(url);
-      setShortenedUrl(shortened);
+      const response = await shortenUrl(url);
+      setShortenedUrl(response.short_url);
     } catch (error) {
       console.error('Error shortening URL:', error);
-      // In a real app, you'd show an error message to the user
+      
+      if (error instanceof ThaloriApiError) {
+        setError(error.message);
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -55,7 +53,16 @@ const Home: React.FC = () => {
                   isLoading={isLoading}
                 />
                 
-                {(shortenedUrl || isLoading) && (
+                {error && (
+                  <div className="home__error">
+                    <div className="error-message slide-in">
+                      <span>⚠️</span>
+                      {error}
+                    </div>
+                  </div>
+                )}
+                
+                {(shortenedUrl || isLoading) && !error && (
                   <div className="home__result-section">
                     {isLoading ? (
                       <div className="home__loading">

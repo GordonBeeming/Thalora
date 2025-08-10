@@ -13,13 +13,13 @@ struct ShortenRequest {
     url: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct ShortenResponse {
     short_url: String,
     original_url: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct ErrorResponse {
     error: String,
 }
@@ -36,12 +36,12 @@ fn generate_short_id() -> String {
         .collect()
 }
 
-// Validate URL format
+// Validate URL format - HTTPS only for security
 fn is_valid_url(url_str: &str) -> bool {
     match Url::parse(url_str) {
         Ok(url) => {
-            // Ensure it's http or https
-            matches!(url.scheme(), "http" | "https")
+            // Only accept HTTPS URLs for security
+            url.scheme() == "https"
         }
         Err(_) => false,
     }
@@ -68,7 +68,7 @@ async fn shorten_url(
     if !is_valid_url(original_url) {
         info!("Invalid URL provided: {original_url}");
         return Ok(HttpResponse::BadRequest().json(ErrorResponse {
-            error: "Invalid URL format. URL must start with http:// or https://".to_string(),
+            error: "Invalid URL format. Only HTTPS URLs are supported for security reasons.".to_string(),
         }));
     }
 
@@ -85,7 +85,7 @@ async fn shorten_url(
 
     // Return the shortened URL
     Ok(HttpResponse::Ok().json(ShortenResponse {
-        short_url: format!("http://localhost:8080/shortened-url/{short_id}"),
+        short_url: format!("https://localhost:8080/shortened-url/{short_id}"),
         original_url: original_url.to_string(),
     }))
 }
@@ -151,4 +151,83 @@ async fn main() -> std::io::Result<()> {
     .bind("127.0.0.1:8080")?
     .run()
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_is_valid_url() {
+        // Valid HTTPS URLs
+        assert!(is_valid_url("https://www.example.com"));
+        assert!(is_valid_url("https://example.com"));
+        assert!(is_valid_url("https://subdomain.example.com/path"));
+        assert!(is_valid_url("https://subdomain.example.com/path?query=1"));
+        assert!(is_valid_url("https://subdomain.example.com/path#fragment"));
+        
+        // Invalid HTTP URLs (should be rejected)
+        assert!(!is_valid_url("http://www.example.com"));
+        assert!(!is_valid_url("http://example.com"));
+        
+        // Invalid formats
+        assert!(!is_valid_url("not-a-url"));
+        assert!(!is_valid_url(""));
+        assert!(!is_valid_url("ftp://example.com"));
+        assert!(!is_valid_url("www.example.com")); // No protocol
+        assert!(!is_valid_url("://example.com")); // Missing scheme
+    }
+
+    #[test]
+    fn test_generate_short_id() {
+        let id1 = generate_short_id();
+        let id2 = generate_short_id();
+        
+        // Should be 8 characters long
+        assert_eq!(id1.len(), 8);
+        assert_eq!(id2.len(), 8);
+        
+        // Should be different (very high probability)
+        assert_ne!(id1, id2);
+        
+        // Should only contain alphanumeric characters
+        assert!(id1.chars().all(|c| c.is_ascii_alphanumeric()));
+        assert!(id2.chars().all(|c| c.is_ascii_alphanumeric()));
+    }
+
+    #[test]
+    fn test_generate_multiple_short_ids_unique() {
+        let mut ids = std::collections::HashSet::new();
+        
+        // Generate 100 IDs and ensure they're all unique
+        for _ in 0..100 {
+            let id = generate_short_id();
+            assert_eq!(id.len(), 8);
+            assert!(id.chars().all(|c| c.is_ascii_alphanumeric()));
+            assert!(ids.insert(id), "Generated duplicate ID");
+        }
+    }
+
+    #[test]
+    fn test_url_validation_edge_cases() {
+        // Test various edge cases for URL validation
+        
+        // Valid HTTPS cases
+        assert!(is_valid_url("https://127.0.0.1"));
+        assert!(is_valid_url("https://localhost:8080"));
+        assert!(is_valid_url("https://example.co.uk/path"));
+        assert!(is_valid_url("https://sub.example.com:443/path?a=1&b=2#section"));
+        
+        // Invalid cases
+        assert!(!is_valid_url(""));
+        assert!(!is_valid_url("   "));
+        assert!(!is_valid_url("https://"));
+        assert!(!is_valid_url("file:///path/to/file"));
+        assert!(!is_valid_url("data:text/plain,hello"));
+        assert!(!is_valid_url("javascript:alert('xss')"));
+        
+        // HTTP should be rejected
+        assert!(!is_valid_url("http://secure-site.com"));
+        assert!(!is_valid_url("http://127.0.0.1:8080"));
+    }
 }
