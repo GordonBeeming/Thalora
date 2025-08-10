@@ -17,6 +17,16 @@ pub struct UrlEntry {
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DomainEntry {
+    pub id: i64,
+    pub user_id: Option<i64>,
+    pub domain_name: String,
+    pub is_verified: bool,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
 #[derive(Debug, Clone)]
 pub struct DatabaseConfig {
     pub connection_string: String,
@@ -230,6 +240,47 @@ impl DatabaseService {
             info!("urls table already exists");
         }
 
+        // Check if domains table exists, create if not
+        let domains_check_query = "
+            SELECT COUNT(*) as table_exists 
+            FROM INFORMATION_SCHEMA.TABLES 
+            WHERE TABLE_NAME = 'domains'
+        ";
+
+        let query = tiberius::Query::new(domains_check_query);
+        let stream = query.query(&mut *conn).await?;
+        let row = stream.into_first_result().await?;
+
+        let domains_table_exists = if let Some(row) = row.into_iter().next() {
+            let count: i32 = row.get(0).unwrap_or(0);
+            count > 0
+        } else {
+            false
+        };
+
+        if !domains_table_exists {
+            info!("Creating domains table...");
+            let create_domains_table_query = "
+                CREATE TABLE domains (
+                    id BIGINT IDENTITY(1,1) PRIMARY KEY,
+                    user_id BIGINT NULL,
+                    domain_name NVARCHAR(255) NOT NULL UNIQUE,
+                    is_verified BIT NOT NULL DEFAULT 0,
+                    created_at DATETIME2 DEFAULT GETUTCDATE(),
+                    updated_at DATETIME2 DEFAULT GETUTCDATE()
+                );
+                
+                CREATE INDEX IX_domains_domain_name ON domains(domain_name);
+                CREATE INDEX IX_domains_user_id ON domains(user_id);
+                CREATE INDEX IX_domains_verified ON domains(is_verified);
+            ";
+            let query = tiberius::Query::new(create_domains_table_query);
+            query.execute(&mut *conn).await?;
+            info!("domains table and indexes created successfully");
+        } else {
+            info!("domains table already exists");
+        }
+
         info!("Database initialization completed");
         Ok(())
     }
@@ -312,5 +363,149 @@ impl DatabaseService {
         } else {
             Ok(false)
         }
+    }
+
+    // Domain management methods
+    pub async fn insert_domain(
+        pool: &DatabasePool,
+        domain_name: &str,
+        user_id: Option<i64>,
+        is_verified: bool,
+    ) -> Result<i64> {
+        let mut conn = pool
+            .get()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
+
+        let query = "
+            USE TaloraDB;
+            INSERT INTO domains (domain_name, user_id, is_verified) 
+            OUTPUT INSERTED.id
+            VALUES (@P1, @P2, @P3)
+        ";
+
+        let mut query = tiberius::Query::new(query);
+        query.bind(domain_name);
+        query.bind(user_id);
+        query.bind(is_verified);
+
+        let stream = query.query(&mut *conn).await?;
+        let row = stream.into_first_result().await?;
+
+        if let Some(row) = row.into_iter().next() {
+            let id: i64 = row.get(0).unwrap();
+            info!("Inserted domain '{}' with ID: {}", domain_name, id);
+            Ok(id)
+        } else {
+            Err(anyhow::anyhow!("Failed to insert domain"))
+        }
+    }
+
+    pub async fn get_domain_by_name(
+        pool: &DatabasePool,
+        domain_name: &str,
+    ) -> Result<Option<DomainEntry>> {
+        let mut conn = pool
+            .get()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
+
+        let query = "
+            USE TaloraDB; 
+            SELECT id, user_id, domain_name, is_verified, created_at, updated_at 
+            FROM domains 
+            WHERE domain_name = @P1
+        ";
+
+        let mut query = tiberius::Query::new(query);
+        query.bind(domain_name);
+
+        let stream = query.query(&mut *conn).await?;
+        let row = stream.into_first_result().await?;
+
+        if let Some(row) = row.into_iter().next() {
+            let id: i64 = row.get(0).unwrap();
+            let user_id: Option<i64> = row.get(1);
+            let domain_name: &str = row.get(2).unwrap();
+            let is_verified: bool = row.get(3).unwrap();
+            let created_at: chrono::DateTime<chrono::Utc> = row.get(4).unwrap();
+            let updated_at: chrono::DateTime<chrono::Utc> = row.get(5).unwrap();
+
+            Ok(Some(DomainEntry {
+                id,
+                user_id,
+                domain_name: domain_name.to_string(),
+                is_verified,
+                created_at,
+                updated_at,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn get_verified_domains(pool: &DatabasePool) -> Result<Vec<DomainEntry>> {
+        let mut conn = pool
+            .get()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
+
+        let query = "
+            USE TaloraDB; 
+            SELECT id, user_id, domain_name, is_verified, created_at, updated_at 
+            FROM domains 
+            WHERE is_verified = 1
+            ORDER BY created_at DESC
+        ";
+
+        let query = tiberius::Query::new(query);
+        let stream = query.query(&mut *conn).await?;
+        let rows = stream.into_first_result().await?;
+
+        let mut domains = Vec::new();
+        for row in rows {
+            let id: i64 = row.get(0).unwrap();
+            let user_id: Option<i64> = row.get(1);
+            let domain_name: &str = row.get(2).unwrap();
+            let is_verified: bool = row.get(3).unwrap();
+            let created_at: chrono::DateTime<chrono::Utc> = row.get(4).unwrap();
+            let updated_at: chrono::DateTime<chrono::Utc> = row.get(5).unwrap();
+
+            domains.push(DomainEntry {
+                id,
+                user_id,
+                domain_name: domain_name.to_string(),
+                is_verified,
+                created_at,
+                updated_at,
+            });
+        }
+
+        Ok(domains)
+    }
+
+    pub async fn update_domain_verification(
+        pool: &DatabasePool,
+        domain_name: &str,
+        is_verified: bool,
+    ) -> Result<bool> {
+        let mut conn = pool
+            .get()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
+
+        let query = "
+            USE TaloraDB;
+            UPDATE domains 
+            SET is_verified = @P2, updated_at = GETUTCDATE()
+            WHERE domain_name = @P1
+        ";
+
+        let mut query = tiberius::Query::new(query);
+        query.bind(domain_name);
+        query.bind(is_verified);
+
+        let result = query.execute(&mut *conn).await?;
+        Ok(result.rows_affected().len() > 0)
     }
 }

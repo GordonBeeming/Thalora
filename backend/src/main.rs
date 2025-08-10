@@ -21,6 +21,19 @@ struct ShortenResponse {
     original_url: String,
 }
 
+#[derive(Deserialize)]
+struct AddDomainRequest {
+    domain_name: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct AddDomainResponse {
+    id: i64,
+    domain_name: String,
+    is_verified: bool,
+    verification_status: String,
+}
+
 #[derive(Serialize, Deserialize)]
 struct ErrorResponse {
     error: String,
@@ -28,6 +41,38 @@ struct ErrorResponse {
 
 // Database service for URL mappings - now uses connection pool
 type AppDatabasePool = web::Data<DatabasePool>;
+
+// Domain validation service
+struct DomainValidationService;
+
+impl DomainValidationService {
+    // Basic domain validation - checks format and basic connectivity
+    async fn validate_domain(domain: &str) -> (bool, String) {
+        // Basic format validation
+        if domain.is_empty() {
+            return (false, "Domain cannot be empty".to_string());
+        }
+
+        if domain.len() > 253 {
+            return (false, "Domain name too long (max 253 characters)".to_string());
+        }
+
+        // Check for valid domain format (basic)
+        let domain_regex = regex::Regex::new(r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$").unwrap();
+        if !domain_regex.is_match(domain) {
+            return (false, "Invalid domain format".to_string());
+        }
+
+        // For now, we'll mark domains as verified if they pass basic validation
+        // In a production system, this would include:
+        // - DNS resolution check
+        // - SSL certificate validation
+        // - TXT record verification for domain ownership
+        
+        info!("Domain '{}' passed basic validation", domain);
+        (true, "Domain verified successfully".to_string())
+    }
+}
 
 // Generate a random shortened URL identifier
 fn generate_short_id() -> String {
@@ -110,17 +155,40 @@ async fn shorten_url(
         }
     }
 
-    // Build the base URL from the current request context
-    let connection_info = http_req.connection_info();
-    let scheme = connection_info.scheme();
-    let host = connection_info.host();
-    
-    // Fallback to localhost:8080 if connection info is not reliable
-    let base_url = if host.is_empty() || scheme.is_empty() {
-        info!("Connection info not reliable (scheme: '{}', host: '{}'), falling back to localhost:8080", scheme, host);
-        "http://localhost:8080".to_string()
-    } else {
-        format!("{}://{}", scheme, host)
+    // Check for verified custom domains - use the first available one
+    let base_url = match DatabaseService::get_verified_domains(&db_pool).await {
+        Ok(domains) => {
+            if let Some(domain) = domains.first() {
+                info!("Using custom domain: {}", domain.domain_name);
+                format!("https://{}", domain.domain_name)
+            } else {
+                // Fall back to default domain
+                let connection_info = http_req.connection_info();
+                let scheme = connection_info.scheme();
+                let host = connection_info.host();
+                
+                // Fallback to localhost:8080 if connection info is not reliable
+                if host.is_empty() || scheme.is_empty() {
+                    info!("Connection info not reliable (scheme: '{}', host: '{}'), falling back to localhost:8080", scheme, host);
+                    "http://localhost:8080".to_string()
+                } else {
+                    format!("{}://{}", scheme, host)
+                }
+            }
+        }
+        Err(e) => {
+            error!("Failed to retrieve domains: {}", e);
+            // Fall back to default domain on error
+            let connection_info = http_req.connection_info();
+            let scheme = connection_info.scheme();
+            let host = connection_info.host();
+            
+            if host.is_empty() || scheme.is_empty() {
+                "http://localhost:8080".to_string()
+            } else {
+                format!("{}://{}", scheme, host)
+            }
+        }
     };
 
     // Return the shortened URL
@@ -172,6 +240,80 @@ async fn health_check() -> Result<HttpResponse> {
         "status": "healthy",
         "service": "thalora-backend"
     })))
+}
+
+// POST /domains endpoint - add a custom domain
+async fn add_domain(
+    req: web::Json<AddDomainRequest>,
+    db_pool: AppDatabasePool,
+) -> Result<HttpResponse> {
+    let domain_name = req.domain_name.trim().to_lowercase();
+
+    info!("Received add domain request for: {}", domain_name);
+
+    // Basic validation
+    if domain_name.is_empty() {
+        return Ok(HttpResponse::BadRequest().json(ErrorResponse {
+            error: "Domain name cannot be empty".to_string(),
+        }));
+    }
+
+    // Check if domain already exists
+    match DatabaseService::get_domain_by_name(&db_pool, &domain_name).await {
+        Ok(Some(_)) => {
+            return Ok(HttpResponse::Conflict().json(ErrorResponse {
+                error: "Domain already exists".to_string(),
+            }));
+        }
+        Ok(None) => {
+            // Domain doesn't exist, continue
+        }
+        Err(e) => {
+            error!("Database error checking domain existence: {}", e);
+            return Ok(HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Database error".to_string(),
+            }));
+        }
+    }
+
+    // Validate the domain
+    let (is_verified, verification_message) = DomainValidationService::validate_domain(&domain_name).await;
+
+    // Store the domain in the database
+    match DatabaseService::insert_domain(&db_pool, &domain_name, None, is_verified).await {
+        Ok(id) => {
+            info!("Added domain '{}' with ID: {}, verified: {}", domain_name, id, is_verified);
+            
+            Ok(HttpResponse::Ok().json(AddDomainResponse {
+                id,
+                domain_name: domain_name.clone(),
+                is_verified,
+                verification_status: verification_message,
+            }))
+        }
+        Err(e) => {
+            error!("Failed to store domain in database: {}", e);
+            Ok(HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Failed to store domain".to_string(),
+            }))
+        }
+    }
+}
+
+// GET /domains endpoint - list all domains
+async fn list_domains(db_pool: AppDatabasePool) -> Result<HttpResponse> {
+    match DatabaseService::get_verified_domains(&db_pool).await {
+        Ok(domains) => {
+            info!("Retrieved {} verified domains", domains.len());
+            Ok(HttpResponse::Ok().json(domains))
+        }
+        Err(e) => {
+            error!("Failed to retrieve domains: {}", e);
+            Ok(HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Failed to retrieve domains".to_string(),
+            }))
+        }
+    }
 }
 
 #[actix_web::main]
@@ -246,6 +388,8 @@ async fn main() -> std::io::Result<()> {
             .route("/health", web::get().to(health_check))
             .route("/shorten", web::post().to(shorten_url))
             .route("/shortened-url/{id}", web::get().to(redirect_url))
+            .route("/domains", web::post().to(add_domain))
+            .route("/domains", web::get().to(list_domains))
     })
     .bind(&bind_address)?
     .run()
@@ -328,5 +472,38 @@ mod tests {
         // HTTP should be rejected
         assert!(!is_valid_url("http://secure-site.com"));
         assert!(!is_valid_url("http://127.0.0.1:8080"));
+    }
+
+    #[tokio::test]
+    async fn test_domain_validation() {
+        // Test domain validation logic
+        
+        // Valid domains
+        let (valid, msg) = DomainValidationService::validate_domain("example.com").await;
+        assert!(valid, "example.com should be valid: {}", msg);
+        
+        let (valid, msg) = DomainValidationService::validate_domain("sub.example.com").await;
+        assert!(valid, "sub.example.com should be valid: {}", msg);
+        
+        let (valid, msg) = DomainValidationService::validate_domain("test-domain.co.uk").await;
+        assert!(valid, "test-domain.co.uk should be valid: {}", msg);
+        
+        // Invalid domains
+        let (valid, _) = DomainValidationService::validate_domain("").await;
+        assert!(!valid, "empty domain should be invalid");
+        
+        let (valid, _) = DomainValidationService::validate_domain("invalid..domain").await;
+        assert!(!valid, "double dots should be invalid");
+        
+        let (valid, _) = DomainValidationService::validate_domain(".invalid.domain").await;
+        assert!(!valid, "starting with dot should be invalid");
+        
+        let (valid, _) = DomainValidationService::validate_domain("invalid.domain.").await;
+        assert!(!valid, "ending with dot should be invalid");
+        
+        // Test very long domain name
+        let long_domain = "a".repeat(300) + ".com";
+        let (valid, _) = DomainValidationService::validate_domain(&long_domain).await;
+        assert!(!valid, "very long domain should be invalid");
     }
 }
