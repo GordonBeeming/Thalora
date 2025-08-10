@@ -47,7 +47,7 @@ The application uses **SQL Server** for persistent URL storage. To set up the da
 
 1. **Quick Setup (Recommended)**:
    ```bash
-   ./scripts/setup-dev-db.sh
+   ./scripts/reset-db.sh
    ```
 
 2. **Manual Setup**:
