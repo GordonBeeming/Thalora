@@ -1,3 +1,4 @@
+use actix_cors::Cors;
 use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result};
 use log::info;
 use rand::distributions::Alphanumeric;
@@ -141,8 +142,15 @@ async fn main() -> std::io::Result<()> {
 
     // Start HTTP server
     HttpServer::new(move || {
+        let cors = Cors::default()
+            .allowed_origin("http://localhost:3000") // Frontend development server
+            .allowed_methods(vec!["GET", "POST"])
+            .allowed_headers(vec!["content-type"])
+            .max_age(3600);
+
         App::new()
             .app_data(web::Data::new(storage.clone()))
+            .wrap(cors)
             .wrap(Logger::default())
             .route("/health", web::get().to(health_check))
             .route("/shorten", web::post().to(shorten_url))
