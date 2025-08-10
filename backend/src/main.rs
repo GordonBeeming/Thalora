@@ -4,11 +4,10 @@ use log::{error, info, warn};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
 use url::Url;
 
 mod database;
-use database::{create_connection, DatabaseConfig, DatabaseService};
+use database::{create_connection_pool, DatabaseConfig, DatabasePool, DatabaseService};
 
 // Data structures for request/response
 #[derive(Deserialize)]
@@ -27,8 +26,8 @@ struct ErrorResponse {
     error: String,
 }
 
-// Database service for URL mappings
-type DatabasePool = Arc<Mutex<DatabaseService>>;
+// Database service for URL mappings - now uses connection pool
+type AppDatabasePool = web::Data<DatabasePool>;
 
 // Generate a random shortened URL identifier
 fn generate_short_id() -> String {
@@ -54,7 +53,7 @@ fn is_valid_url(url_str: &str) -> bool {
 async fn shorten_url(
     req: web::Json<ShortenRequest>,
     http_req: HttpRequest,
-    db_pool: web::Data<DatabasePool>,
+    db_pool: AppDatabasePool,
 ) -> Result<HttpResponse> {
     let original_url = req.url.trim();
 
@@ -80,18 +79,8 @@ async fn shorten_url(
     let short_id = loop {
         let candidate = generate_short_id();
         
-        // Check if this ID already exists in the database
-        let mut db_service = match db_pool.lock() {
-            Ok(service) => service,
-            Err(e) => {
-                error!("Failed to acquire database lock: {}", e);
-                return Ok(HttpResponse::InternalServerError().json(ErrorResponse {
-                    error: "Database connection error".to_string(),
-                }));
-            }
-        };
-
-        match db_service.url_exists(&candidate).await {
+        // Check if this ID already exists in the database using the pool
+        match DatabaseService::url_exists(&db_pool, &candidate).await {
             Ok(exists) => {
                 if !exists {
                     break candidate;
@@ -108,28 +97,16 @@ async fn shorten_url(
         }
     };
 
-    // Store the mapping in the database
-    {
-        let mut db_service = match db_pool.lock() {
-            Ok(service) => service,
-            Err(e) => {
-                error!("Failed to acquire database lock: {}", e);
-                return Ok(HttpResponse::InternalServerError().json(ErrorResponse {
-                    error: "Database connection error".to_string(),
-                }));
-            }
-        };
-
-        match db_service.insert_url(original_url, &short_id).await {
-            Ok(id) => {
-                info!("Created short URL {} for {} with database ID {}", short_id, original_url, id);
-            }
-            Err(e) => {
-                error!("Failed to store URL in database: {}", e);
-                return Ok(HttpResponse::InternalServerError().json(ErrorResponse {
-                    error: "Failed to store URL".to_string(),
-                }));
-            }
+    // Store the mapping in the database using the pool
+    match DatabaseService::insert_url(&db_pool, original_url, &short_id).await {
+        Ok(id) => {
+            info!("Created short URL {} for {} with database ID {}", short_id, original_url, id);
+        }
+        Err(e) => {
+            error!("Failed to store URL in database: {}", e);
+            return Ok(HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Failed to store URL".to_string(),
+            }));
         }
     }
 
@@ -156,32 +133,20 @@ async fn shorten_url(
 // GET /shortened-url/{id} endpoint
 async fn redirect_url(
     path: web::Path<String>,
-    db_pool: web::Data<DatabasePool>,
+    db_pool: AppDatabasePool,
 ) -> Result<HttpResponse> {
     let short_id = path.into_inner();
 
     info!("Received redirect request for short ID: {short_id}");
 
-    // Look up the original URL in the database
-    let original_url = {
-        let mut db_service = match db_pool.lock() {
-            Ok(service) => service,
-            Err(e) => {
-                error!("Failed to acquire database lock: {}", e);
-                return Ok(HttpResponse::InternalServerError().json(ErrorResponse {
-                    error: "Database connection error".to_string(),
-                }));
-            }
-        };
-
-        match db_service.get_original_url(&short_id).await {
-            Ok(url) => url,
-            Err(e) => {
-                error!("Database error retrieving URL for {}: {}", short_id, e);
-                return Ok(HttpResponse::InternalServerError().json(ErrorResponse {
-                    error: "Database error".to_string(),
-                }));
-            }
+    // Look up the original URL in the database using the pool
+    let original_url = match DatabaseService::get_original_url(&db_pool, &short_id).await {
+        Ok(url) => url,
+        Err(e) => {
+            error!("Database error retrieving URL for {}: {}", short_id, e);
+            return Ok(HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Database error".to_string(),
+            }));
         }
     };
 
@@ -231,11 +196,11 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
-    // Create database connection
-    let db_client = match create_connection(&db_config).await {
-        Ok(client) => client,
+    // Create database connection pool
+    let db_pool = match create_connection_pool(&db_config).await {
+        Ok(pool) => pool,
         Err(e) => {
-            error!("Failed to connect to database: {}", e);
+            error!("Failed to create database connection pool: {}", e);
             error!("Connection string: {}", db_config.connection_string);
             error!("");
             error!("To fix this issue:");
@@ -247,19 +212,14 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
-    // Create database service
-    let mut db_service = DatabaseService::new(db_client);
-    
     // Initialize database schema (create database and tables if they don't exist)
-    if let Err(e) = db_service.initialize_database().await {
+    if let Err(e) = DatabaseService::initialize_database(&db_pool).await {
         error!("Failed to initialize database: {}", e);
         error!("Make sure SQL Server is running and the user has sufficient privileges");
         std::process::exit(1);
     }
-    
-    let db_pool: DatabasePool = Arc::new(Mutex::new(db_service));
 
-    info!("Database connection established successfully");
+    info!("Database connection pool established successfully");
 
     // Get server configuration from environment or use defaults
     let host = std::env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
