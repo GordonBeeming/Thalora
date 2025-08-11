@@ -9,8 +9,8 @@ use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-mod database;
 mod auth;
+mod database;
 
 use auth::auth::{login_begin, login_complete, logout, me, register_begin, register_complete};
 use database::{create_connection_pool, DatabaseConfig, DatabasePool, DatabaseService};
@@ -266,13 +266,22 @@ async fn shorten_url(
                     format!("https://{}", domain.domain_name)
                 } else {
                     // Requested domain not found or not verified
-                    info!("Requested domain '{}' not found or not verified", requested_domain);
+                    info!(
+                        "Requested domain '{}' not found or not verified",
+                        requested_domain
+                    );
                     return Ok(HttpResponse::BadRequest().json(ErrorResponse {
-                        error: format!("Domain '{}' is not verified or does not exist", requested_domain),
+                        error: format!(
+                            "Domain '{}' is not verified or does not exist",
+                            requested_domain
+                        ),
                     }));
                 }
             } else if let Some(domain) = domains.first() {
-                info!("Using first available custom domain: {}", domain.domain_name);
+                info!(
+                    "Using first available custom domain: {}",
+                    domain.domain_name
+                );
                 format!("https://{}", domain.domain_name)
             } else {
                 // Check if we allow fallback to localhost in development
@@ -536,7 +545,7 @@ async fn main() -> std::io::Result<()> {
         Err(e) => {
             error!("Failed to load database configuration: {}", e);
             error!("Make sure DATABASE_URL is set in environment or .env file");
-            error!("Example: DATABASE_URL=Server=localhost,1433;Database=TaloraDB;User=sa;Password=YourPassword;TrustServerCertificate=true;");
+            error!("Example: DATABASE_URL=Server=localhost,1433;Database=ThaloraDB;User=sa;Password=YourPassword;TrustServerCertificate=true;");
             error!("To set up a local SQL Server database, run: ./scripts/setup-dev-db.sh");
             std::process::exit(1);
         }
@@ -587,25 +596,20 @@ async fn main() -> std::io::Result<()> {
             .allowed_headers(vec!["content-type", "accept", "origin", "x-requested-with"])
             .supports_credentials() // Required for session cookies
             .max_age(3600);
-        
+
         // Add all allowed origins
         for origin in &allowed_origins {
             cors = cors.allowed_origin(origin);
         }
 
-        let session_middleware = SessionMiddleware::builder(
-            CookieSessionStore::default(),
-            secret_key.clone(),
-        )
-        .cookie_secure(false) // Set to true in production with HTTPS
-        .cookie_http_only(true)
-        .session_lifecycle(
-            PersistentSession::default()
-                .session_ttl_extension_policy(
+        let session_middleware =
+            SessionMiddleware::builder(CookieSessionStore::default(), secret_key.clone())
+                .cookie_secure(false) // Set to true in production with HTTPS
+                .cookie_http_only(true)
+                .session_lifecycle(PersistentSession::default().session_ttl_extension_policy(
                     actix_session::config::TtlExtensionPolicy::OnStateChanges,
-                ),
-        )
-        .build();
+                ))
+                .build();
 
         App::new()
             .app_data(web::Data::new(db_pool.clone()))

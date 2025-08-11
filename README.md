@@ -58,8 +58,8 @@ The application uses **SQL Server** for persistent URL storage. To set up the da
    # Wait for SQL Server to start (about 20 seconds)
    
    # Create database and tables
-   docker exec thalora-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P TaloraDevPassword123! -C -Q "CREATE DATABASE TaloraDB;"
-   docker exec thalora-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P TaloraDevPassword123! -d TaloraDB -C -i /home/database/init.sql
+   docker exec thalora-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ThaloraDevPassword123! -C -Q "CREATE DATABASE ThaloraDB;"
+   docker exec thalora-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ThaloraDevPassword123! -d ThaloraDB -C -i /home/database/init.sql
    ```
 
 ### Backend (Rust API)
