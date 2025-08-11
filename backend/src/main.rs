@@ -573,14 +573,25 @@ async fn main() -> std::io::Result<()> {
     // Generate a secure random key for session cookies
     let secret_key = Key::generate();
 
+    // Get CORS configuration
+    let allowed_origins = std::env::var("ALLOWED_ORIGINS")
+        .unwrap_or_else(|_| "http://localhost:3000".to_string())
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .collect::<Vec<String>>();
+
     // Start HTTP server
     HttpServer::new(move || {
-        let cors = Cors::default()
-            .allowed_origin("http://localhost:3000") // Frontend development server
+        let mut cors = Cors::default()
             .allowed_methods(vec!["GET", "POST", "OPTIONS"]) // Add OPTIONS for preflight
             .allowed_headers(vec!["content-type", "accept", "origin", "x-requested-with"])
             .supports_credentials() // Required for session cookies
             .max_age(3600);
+        
+        // Add all allowed origins
+        for origin in &allowed_origins {
+            cors = cors.allowed_origin(origin);
+        }
 
         let session_middleware = SessionMiddleware::builder(
             CookieSessionStore::default(),
@@ -614,7 +625,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/logout", web::post().to(logout))
                     .route("/me", web::get().to(me)),
             )
-            // Protected endpoints (no authentication middleware for now - TODO: Add later)
+            // Protected endpoints - authentication can be added later through extractors
             .service(
                 web::scope("/api")
                     .route("/shorten", web::post().to(shorten_url))

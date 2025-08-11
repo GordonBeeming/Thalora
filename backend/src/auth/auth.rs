@@ -255,8 +255,8 @@ pub async fn register_begin(
         user_id: user_id_b64.clone(),
         timeout: 60000, // 60 seconds
         rp: RelyingParty {
-            id: "localhost".to_string(), // Should be configurable
-            name: "Thalora URL Shortener".to_string(),
+            id: std::env::var("WEBAUTHN_RP_ID").unwrap_or_else(|_| "localhost".to_string()),
+            name: std::env::var("WEBAUTHN_RP_NAME").unwrap_or_else(|_| "Thalora URL Shortener".to_string()),
         },
         user: UserInfo {
             id: user_id_b64,
@@ -350,8 +350,8 @@ pub async fn register_complete(
     }
 
     // Validate credential
-    let expected_origin = "http://localhost:3000"; // Should be configurable
-    match AuthService::validate_registration_credential(&req.credential, stored_challenge, expected_origin).await {
+    let expected_origin = std::env::var("WEBAUTHN_ORIGIN").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    match AuthService::validate_registration_credential(&req.credential, stored_challenge, &expected_origin).await {
         Ok((credential_id, public_key)) => {
             // Store user in database
             match DatabaseService::create_user(
@@ -444,7 +444,7 @@ pub async fn login_begin(
     let response = LoginBeginResponse {
         challenge: challenge_b64,
         timeout: 60000, // 60 seconds
-        rp_id: "localhost".to_string(), // Should be configurable
+        rp_id: std::env::var("WEBAUTHN_RP_ID").unwrap_or_else(|_| "localhost".to_string()),
         allow_credentials: vec![AllowedCredential {
             id: AuthService::encode_base64(&user.passkey_credential_id),
             cred_type: "public-key".to_string(),
@@ -516,11 +516,11 @@ pub async fn login_complete(
     };
 
     // Validate credential
-    let expected_origin = "http://localhost:3000"; // Should be configurable
+    let expected_origin = std::env::var("WEBAUTHN_ORIGIN").unwrap_or_else(|_| "http://localhost:3000".to_string());
     match AuthService::validate_authentication_credential(
         &req.credential,
         stored_challenge,
-        expected_origin,
+        &expected_origin,
         &user.passkey_public_key,
         user.passkey_counter,
     ).await {
