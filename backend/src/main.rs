@@ -536,7 +536,7 @@ async fn main() -> std::io::Result<()> {
         Err(e) => {
             error!("Failed to load database configuration: {}", e);
             error!("Make sure DATABASE_URL is set in environment or .env file");
-            error!("Example: DATABASE_URL=Server=localhost,1433;Database=master;User=sa;Password=YourPassword;TrustServerCertificate=true;");
+            error!("Example: DATABASE_URL=Server=localhost,1433;Database=TaloraDB;User=sa;Password=YourPassword;TrustServerCertificate=true;");
             error!("To set up a local SQL Server database, run: ./scripts/setup-dev-db.sh");
             std::process::exit(1);
         }

@@ -10,7 +10,7 @@ BEGIN
         username NVARCHAR(255) NOT NULL UNIQUE,
         email NVARCHAR(320) NOT NULL UNIQUE,
         passkey_public_key VARBINARY(MAX) NOT NULL,
-        passkey_credential_id VARBINARY(MAX) NOT NULL UNIQUE,
+        passkey_credential_id VARBINARY(512) NOT NULL UNIQUE, -- Limited size for unique constraint
         passkey_counter BIGINT NOT NULL DEFAULT 0,
         created_at DATETIME2 DEFAULT GETUTCDATE(),
         updated_at DATETIME2 DEFAULT GETUTCDATE()
