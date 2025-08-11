@@ -78,7 +78,7 @@ But for daily development, running the backend locally (`cargo run`) is faster a
    ```
    This will:
    - Start SQL Server 2022 in a Docker container
-   - Create the `TaloraDB` database
+   - Create the `ThaloraDB` database
    - Create the `urls` table with proper indexes
 
 2. **Copy environment configuration:**
@@ -100,7 +100,7 @@ But for daily development, running the backend locally (`cargo run`) is faster a
 
 2. **Create a `.env` file** in the project root:
    ```env
-   DATABASE_URL=Server=localhost,1433;Database=master;User=sa;Password=YourPassword;TrustServerCertificate=true;
+   DATABASE_URL=Server=localhost,1433;Database=ThaloraDB;User=sa;Password=YourPassword;TrustServerCertificate=true;
    SERVER_HOST=127.0.0.1
    SERVER_PORT=8080
    RUST_LOG=info
@@ -117,7 +117,7 @@ But for daily development, running the backend locally (`cargo run`) is faster a
 
 The backend automatically creates the following schema:
 
-- **Database**: `TaloraDB`
+- **Database**: `ThaloraDB`
 - **Table**: `urls`
   - `id` (BIGINT, auto-increment primary key)
   - `original_url` (NVARCHAR(2048))
@@ -163,13 +163,13 @@ curl http://localhost:8080/health
    ```bash
    # Test Docker SQL Server connection
    docker exec thalora-sqlserver /opt/mssql-tools18/bin/sqlcmd \
-     -S localhost -U sa -P TaloraDevPassword123! -C -Q "SELECT 1"
+     -S localhost -U sa -P ThaloraDevPassword123! -C -Q "SELECT 1"
    ```
 
 3. **Check .env configuration:**
    - Ensure `DATABASE_URL` is correctly set
    - For Docker setup, use `TrustServerCertificate=true`
-   - Connect to `master` database initially (backend will create TaloraDB)
+   - Connect to `master` database initially (backend will create ThaloraDB)
 
 ### Database connection errors
 

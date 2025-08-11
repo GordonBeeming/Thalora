@@ -57,6 +57,33 @@ get_database_name() {
     fi
 }
 
+# Function to create database if it doesn't exist
+create_database_if_not_exists() {
+    local database="$1"
+    local password="$2"
+    
+    print_status $BLUE "🗃️  Ensuring database '$database' exists..."
+    
+    local create_db_sql="
+IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = '$database')
+BEGIN
+    CREATE DATABASE [$database];
+    PRINT 'Database $database created successfully.';
+END
+ELSE
+BEGIN
+    PRINT 'Database $database already exists.';
+END
+"
+    
+    # Execute against master database to create the target database
+    if command -v sqlcmd >/dev/null 2>&1; then
+        echo "$create_db_sql" | sqlcmd -S localhost,1433 -U sa -P "$password" -d master -b
+    else
+        echo "$create_db_sql" | docker exec -i $(docker compose ps -q sqlserver) /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$password" -d master -C
+    fi
+}
+
 # Function to execute SQL script
 execute_sql() {
     local file="$1"
@@ -171,6 +198,28 @@ main() {
     local database_name=$(get_database_name)
     print_status $BLUE "📊 Target database: $database_name"
     
+    # Read password for database creation
+    local password=""
+    if [[ -f "$SCRIPT_DIR/../backend/.env" ]]; then
+        local connection_string=$(grep "^DATABASE_URL=" "$SCRIPT_DIR/../backend/.env" | cut -d'=' -f2-)
+        if [[ $connection_string =~ Password=([^;]+) ]]; then
+            password="${BASH_REMATCH[1]}"
+        fi
+    elif [[ -f "$SCRIPT_DIR/../.env" ]]; then
+        local connection_string=$(grep "^DATABASE_URL=" "$SCRIPT_DIR/../.env" | cut -d'=' -f2-)
+        if [[ $connection_string =~ Password=([^;]+) ]]; then
+            password="${BASH_REMATCH[1]}"
+        fi
+    fi
+    
+    if [[ -z "$password" ]]; then
+        print_status $RED "Error: Could not extract password from DATABASE_URL in .env file"
+        exit 1
+    fi
+    
+    # Create database if it doesn't exist
+    create_database_if_not_exists "$database_name" "$password"
+    
     # Check if migrations directory exists
     if [[ ! -d "$MIGRATIONS_DIR" ]]; then
         print_status $RED "Error: Migrations directory not found: $MIGRATIONS_DIR"
@@ -200,8 +249,10 @@ main() {
                 
                 # Execute the migration
                 if execute_sql "$migration_file" "$database_name"; then
-                    # Record successful migration
-                    record_migration "$hash" "$filename" "$database_name"
+                    # Record successful migration (only if not already recorded)
+                    if ! is_migration_applied "$hash" "$database_name"; then
+                        record_migration "$hash" "$filename" "$database_name"
+                    fi
                     print_status $GREEN "✅ Successfully applied: $filename"
                     applied_count=$((applied_count + 1))
                 else

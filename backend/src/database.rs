@@ -5,6 +5,7 @@ use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::env;
 use tiberius::Config;
+use chrono::{DateTime, Utc};
 
 pub type DatabasePool = Pool<ConnectionManager>;
 
@@ -26,6 +27,18 @@ pub struct DomainEntry {
     pub verification_token: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserEntry {
+    pub id: i64,
+    pub username: String,
+    pub email: String,
+    pub passkey_public_key: Vec<u8>,
+    pub passkey_credential_id: Vec<u8>,
+    pub passkey_counter: u32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone)]
@@ -477,6 +490,199 @@ impl DatabaseService {
         let mut query = tiberius::Query::new(query);
         query.bind(domain_id);
         query.bind(is_verified);
+
+        let result = query.execute(&mut *conn).await?;
+        Ok(result.rows_affected().len() > 0)
+    }
+
+    // User management methods
+    pub async fn create_user(
+        pool: &DatabasePool,
+        username: &str,
+        email: &str,
+        passkey_public_key: &[u8],
+        passkey_credential_id: &[u8],
+        passkey_counter: u32,
+    ) -> Result<i64> {
+        let mut conn = pool
+            .get()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
+
+        let query = "
+            INSERT INTO users (username, email, passkey_public_key, passkey_credential_id, passkey_counter) 
+            OUTPUT INSERTED.id
+            VALUES (@P1, @P2, @P3, @P4, @P5)";
+
+        let mut query = tiberius::Query::new(query);
+        query.bind(username);
+        query.bind(email);
+        query.bind(passkey_public_key);
+        query.bind(passkey_credential_id);
+        query.bind(passkey_counter as i64);
+
+        let stream = query.query(&mut *conn).await?;
+        let row = stream.into_first_result().await?;
+
+        if let Some(row) = row.into_iter().next() {
+            let id: i64 = row.get(0).unwrap();
+            info!("Created user '{}' with ID: {}", username, id);
+            Ok(id)
+        } else {
+            Err(anyhow::anyhow!("Failed to create user"))
+        }
+    }
+
+    pub async fn get_user_by_id(pool: &DatabasePool, user_id: i64) -> Result<Option<UserEntry>> {
+        let mut conn = pool
+            .get()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
+
+        let query = "
+            SELECT id, username, email, passkey_public_key, passkey_credential_id, passkey_counter, created_at, updated_at
+            FROM users 
+            WHERE id = @P1";
+
+        let mut query = tiberius::Query::new(query);
+        query.bind(user_id);
+
+        let stream = query.query(&mut *conn).await?;
+        let row = stream.into_first_result().await?;
+
+        if let Some(row) = row.into_iter().next() {
+            let id: i64 = row.get(0).unwrap();
+            let username: &str = row.get(1).unwrap();
+            let email: &str = row.get(2).unwrap();
+            let passkey_public_key: &[u8] = row.get(3).unwrap();
+            let passkey_credential_id: &[u8] = row.get(4).unwrap();
+            let passkey_counter: i64 = row.get(5).unwrap();
+            let created_at: DateTime<Utc> = row.get(6).unwrap();
+            let updated_at: DateTime<Utc> = row.get(7).unwrap();
+
+            Ok(Some(UserEntry {
+                id,
+                username: username.to_string(),
+                email: email.to_string(),
+                passkey_public_key: passkey_public_key.to_vec(),
+                passkey_credential_id: passkey_credential_id.to_vec(),
+                passkey_counter: passkey_counter as u32,
+                created_at,
+                updated_at,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn get_user_by_username(
+        pool: &DatabasePool,
+        username: &str,
+    ) -> Result<Option<UserEntry>> {
+        let mut conn = pool
+            .get()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
+
+        let query = "
+            SELECT id, username, email, passkey_public_key, passkey_credential_id, passkey_counter, created_at, updated_at
+            FROM users 
+            WHERE username = @P1";
+
+        let mut query = tiberius::Query::new(query);
+        query.bind(username);
+
+        let stream = query.query(&mut *conn).await?;
+        let row = stream.into_first_result().await?;
+
+        if let Some(row) = row.into_iter().next() {
+            let id: i64 = row.get(0).unwrap();
+            let username: &str = row.get(1).unwrap();
+            let email: &str = row.get(2).unwrap();
+            let passkey_public_key: &[u8] = row.get(3).unwrap();
+            let passkey_credential_id: &[u8] = row.get(4).unwrap();
+            let passkey_counter: i64 = row.get(5).unwrap();
+            let created_at: DateTime<Utc> = row.get(6).unwrap();
+            let updated_at: DateTime<Utc> = row.get(7).unwrap();
+
+            Ok(Some(UserEntry {
+                id,
+                username: username.to_string(),
+                email: email.to_string(),
+                passkey_public_key: passkey_public_key.to_vec(),
+                passkey_credential_id: passkey_credential_id.to_vec(),
+                passkey_counter: passkey_counter as u32,
+                created_at,
+                updated_at,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn get_user_by_email(
+        pool: &DatabasePool,
+        email: &str,
+    ) -> Result<Option<UserEntry>> {
+        let mut conn = pool
+            .get()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
+
+        let query = "
+            SELECT id, username, email, passkey_public_key, passkey_credential_id, passkey_counter, created_at, updated_at
+            FROM users 
+            WHERE email = @P1";
+
+        let mut query = tiberius::Query::new(query);
+        query.bind(email);
+
+        let stream = query.query(&mut *conn).await?;
+        let row = stream.into_first_result().await?;
+
+        if let Some(row) = row.into_iter().next() {
+            let id: i64 = row.get(0).unwrap();
+            let username: &str = row.get(1).unwrap();
+            let email: &str = row.get(2).unwrap();
+            let passkey_public_key: &[u8] = row.get(3).unwrap();
+            let passkey_credential_id: &[u8] = row.get(4).unwrap();
+            let passkey_counter: i64 = row.get(5).unwrap();
+            let created_at: DateTime<Utc> = row.get(6).unwrap();
+            let updated_at: DateTime<Utc> = row.get(7).unwrap();
+
+            Ok(Some(UserEntry {
+                id,
+                username: username.to_string(),
+                email: email.to_string(),
+                passkey_public_key: passkey_public_key.to_vec(),
+                passkey_credential_id: passkey_credential_id.to_vec(),
+                passkey_counter: passkey_counter as u32,
+                created_at,
+                updated_at,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn update_user_counter(
+        pool: &DatabasePool,
+        user_id: i64,
+        new_counter: u32,
+    ) -> Result<bool> {
+        let mut conn = pool
+            .get()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get connection from pool: {}", e))?;
+
+        let query = "
+            UPDATE users 
+            SET passkey_counter = @P2, updated_at = GETUTCDATE()
+            WHERE id = @P1";
+
+        let mut query = tiberius::Query::new(query);
+        query.bind(user_id);
+        query.bind(new_counter as i64);
 
         let result = query.execute(&mut *conn).await?;
         Ok(result.rows_affected().len() > 0)

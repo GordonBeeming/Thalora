@@ -30,6 +30,16 @@ chrono = { version = "0.4", features = ["serde"] }
 regex = "1.10"
 # DNS resolution for TXT record verification
 trust-dns-resolver = "0.23"
+# WebAuthn/FIDO2 authentication
+webauthn-rs = { version = "0.5", features = ["danger-allow-state-serialisation"] }
+# Base64 encoding for WebAuthn credentials
+base64 = "0.22"
+# UUID generation for user IDs and challenge generation
+uuid = { version = "1.10", features = ["v4", "serde"] }
+# Session management
+actix-session = { version = "0.10", features = ["cookie-session"] }
+# Futures utilities
+futures-util = "0.3"
 
 [dev-dependencies]
 actix-rt = "2.9"

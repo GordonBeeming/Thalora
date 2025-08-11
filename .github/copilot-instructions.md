@@ -27,6 +27,8 @@ Thalora is a modern, secure, and customizable URL shortener built with React (fr
 - **Zero warnings policy**: All warnings must be fixed after any work is completed. No warnings should remain in the codebase.
 - **Clean builds required**: Both backend (`cargo build`) and frontend (`pnpm build`) must compile without warnings.
 - **Warning fixes mandatory**: Address all compiler warnings immediately, never leave them for later.
+- **No TODOs allowed**: All TODO comments must be resolved immediately. Instead of leaving TODOs, either implement the feature or create a GitHub issue to track the work.
+- **Complete implementations only**: Never commit placeholder or simplified implementations marked with "real implementation would..." comments. Either implement properly or don't implement at all.
 
 ### Feedback Integration
 - **Update instructions for coding patterns**: When specific feedback is given about "doing something a certain way", immediately update these instructions to include that pattern as a core principle.

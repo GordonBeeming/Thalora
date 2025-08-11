@@ -4,7 +4,7 @@ services:
     container_name: thalora-sqlserver
     environment:
       - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=TaloraDevPassword123!
+      - MSSQL_SA_PASSWORD=ThaloraDevPassword123!
       - MSSQL_PID=Express
     ports:
       - "1433:1433"
@@ -13,7 +13,11 @@ services:
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P TaloraDevPassword123! -C -Q 'SELECT 1'"]
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ThaloraDevPassword123! -C -Q 'SELECT 1'",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -25,7 +29,7 @@ services:
       dockerfile: Dockerfile
     container_name: thalora-backend
     environment:
-      - DATABASE_URL=Server=sqlserver,1433;Database=TaloraDB;User=sa;Password=TaloraDevPassword123!;TrustServerCertificate=true;
+      - DATABASE_URL=Server=sqlserver,1433;Database=ThaloraDB;User=sa;Password=ThaloraDevPassword123!;TrustServerCertificate=true;
       - RUST_LOG=info
     ports:
       - "8080:8080"
