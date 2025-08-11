@@ -260,7 +260,14 @@ describe('Auth Service', () => {
       } as Response);
 
       const result = await getCurrentUser();
-      expect(result).toBeNull();
+    test('throws when not authenticated', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({ error: 'Not authenticated' }),
+      } as Response);
+
+      await expect(getCurrentUser()).rejects.toThrow('Not authenticated');
     });
   });
 
