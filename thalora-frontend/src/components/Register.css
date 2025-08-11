@@ -1,0 +1,245 @@
+.register {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+}
+
+.register__container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  padding: 40px;
+  width: 100%;
+  max-width: 450px;
+  text-align: center;
+}
+
+.register__header {
+  margin-bottom: 30px;
+}
+
+.register__title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0 0 10px 0;
+}
+
+.register__subtitle {
+  color: #718096;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.register__form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.register__field {
+  text-align: left;
+}
+
+.register__label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #4a5568;
+  margin-bottom: 8px;
+}
+
+.register__input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.register__input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.register__input:disabled {
+  background-color: #f7fafc;
+  cursor: not-allowed;
+}
+
+.register__error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background-color: #fed7d7;
+  border: 1px solid #feb2b2;
+  border-radius: 8px;
+  color: #c53030;
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.register__error-icon {
+  font-size: 1.2rem;
+}
+
+.register__submit {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 14px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.register__submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+}
+
+.register__submit:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.register__submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.register__submit-icon {
+  font-size: 1.2rem;
+}
+
+.register__loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.register__info {
+  margin-bottom: 30px;
+  padding: 20px;
+  background-color: #f7fafc;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.register__info-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.register__info-item:last-child {
+  margin-bottom: 0;
+}
+
+.register__info-icon {
+  font-size: 1.2rem;
+  margin-top: 2px;
+}
+
+.register__info-item p {
+  margin: 0;
+  color: #4a5568;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.register__footer {
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.register__switch {
+  color: #718096;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.register__switch-button {
+  background: none;
+  border: none;
+  color: #667eea;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  font-size: inherit;
+}
+
+.register__switch-button:hover:not(:disabled) {
+  color: #5a67d8;
+}
+
+.register__switch-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.register__warning {
+  margin-top: 20px;
+  padding: 12px;
+  background-color: #fef5e7;
+  border: 1px solid #f6e05e;
+  border-radius: 8px;
+  color: #d69e2e;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.register__warning-icon {
+  font-size: 1.2rem;
+  margin-right: 8px;
+}
+
+.register__warning p {
+  margin: 0;
+  display: inline;
+}
+
+/* Responsive design */
+@media (max-width: 480px) {
+  .register {
+    padding: 10px;
+  }
+  
+  .register__container {
+    padding: 30px 20px;
+  }
+  
+  .register__title {
+    font-size: 1.5rem;
+  }
+  
+  .register__info {
+    padding: 15px;
+  }
+}
