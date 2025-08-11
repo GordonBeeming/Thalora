@@ -108,6 +108,7 @@ pub struct AllowedCredential {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // Fields are used by webauthn library through deserialization
 pub struct PublicKeyCredential {
     pub id: String,
     pub raw_id: String,
@@ -130,6 +131,7 @@ pub struct AuthenticatorAttestationResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // Fields are used by webauthn library through deserialization
 pub struct AuthenticatorAssertionResponse {
     pub client_data_json: String,
     pub authenticator_data: String,
