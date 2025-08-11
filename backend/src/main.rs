@@ -1,5 +1,8 @@
 use actix_cors::Cors;
-use actix_web::{middleware::Logger, web, App, HttpRequest, HttpResponse, HttpServer, Result};
+use actix_session::{config::PersistentSession, storage::CookieSessionStore, SessionMiddleware};
+use actix_web::{
+    cookie::Key, middleware::Logger, web, App, HttpRequest, HttpResponse, HttpServer, Result,
+};
 use log::{error, info, warn};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
@@ -7,6 +10,9 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 mod database;
+mod auth;
+
+use auth::auth::{login_begin, login_complete, logout, me, register_begin, register_complete};
 use database::{create_connection_pool, DatabaseConfig, DatabasePool, DatabaseService};
 
 // Data structures for request/response
@@ -564,24 +570,58 @@ async fn main() -> std::io::Result<()> {
     let bind_address = format!("{}:{}", host, port);
     info!("Server will bind to: {}", bind_address);
 
+    // Generate a secure random key for session cookies
+    let secret_key = Key::generate();
+
     // Start HTTP server
     HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin("http://localhost:3000") // Frontend development server
             .allowed_methods(vec!["GET", "POST", "OPTIONS"]) // Add OPTIONS for preflight
             .allowed_headers(vec!["content-type", "accept", "origin", "x-requested-with"])
+            .supports_credentials() // Required for session cookies
             .max_age(3600);
+
+        let session_middleware = SessionMiddleware::builder(
+            CookieSessionStore::default(),
+            secret_key.clone(),
+        )
+        .cookie_secure(false) // Set to true in production with HTTPS
+        .cookie_http_only(true)
+        .session_lifecycle(
+            PersistentSession::default()
+                .session_ttl_extension_policy(
+                    actix_session::config::TtlExtensionPolicy::OnStateChanges,
+                ),
+        )
+        .build();
 
         App::new()
             .app_data(web::Data::new(db_pool.clone()))
             .wrap(cors)
+            .wrap(session_middleware)
             .wrap(Logger::default())
+            // Public endpoints
             .route("/health", web::get().to(health_check))
-            .route("/shorten", web::post().to(shorten_url))
             .route("/shortened-url/{id}", web::get().to(redirect_url))
-            .route("/domains", web::post().to(add_domain))
-            .route("/domains", web::get().to(list_domains))
-            .route("/domains/{id}/verify", web::post().to(verify_domain))
+            // Authentication endpoints
+            .service(
+                web::scope("/auth")
+                    .route("/register/begin", web::post().to(register_begin))
+                    .route("/register/complete", web::post().to(register_complete))
+                    .route("/login/begin", web::post().to(login_begin))
+                    .route("/login/complete", web::post().to(login_complete))
+                    .route("/logout", web::post().to(logout))
+                    .route("/me", web::get().to(me)),
+            )
+            // Protected endpoints (no authentication middleware for now - TODO: Add later)
+            .service(
+                web::scope("/api")
+                    .route("/shorten", web::post().to(shorten_url))
+                    .route("/domains", web::post().to(add_domain))
+                    .route("/domains", web::get().to(list_domains))
+                    .route("/domains/{id}/verify", web::post().to(verify_domain)),
+            )
     })
     .bind(&bind_address)?
     .run()
