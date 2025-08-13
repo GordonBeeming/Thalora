@@ -28,7 +28,7 @@ jobs:
 
     - name: Install frontend dependencies
       working-directory: ./thalora-frontend
-      run: pnpm install
+      run: pnpm install --no-frozen-lockfile
 
     - name: Install Playwright Browsers
       working-directory: ./thalora-frontend
