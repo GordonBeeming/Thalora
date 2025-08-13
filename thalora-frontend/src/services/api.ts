@@ -55,7 +55,7 @@ export class ThaloraApiError extends Error {
  */
 export async function shortenUrl(url: string): Promise<ShortenUrlResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/shorten`, {
+    const response = await fetch(`${API_BASE_URL}/api/shorten`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -120,7 +120,7 @@ export async function checkHealth(): Promise<boolean> {
  */
 export async function addDomain(domainName: string): Promise<AddDomainResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/domains`, {
+    const response = await fetch(`${API_BASE_URL}/api/domains`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -165,7 +165,7 @@ export async function addDomain(domainName: string): Promise<AddDomainResponse> 
  */
 export async function listDomains(): Promise<DomainEntry[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/domains`, {
+    const response = await fetch(`${API_BASE_URL}/api/domains`, {
       method: 'GET',
     });
 
@@ -206,7 +206,7 @@ export async function listDomains(): Promise<DomainEntry[]> {
  */
 export async function verifyDomain(domainId: number): Promise<AddDomainResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/domains/${domainId}/verify`, {
+    const response = await fetch(`${API_BASE_URL}/api/domains/${domainId}/verify`, {
       method: 'POST',
     });
 
