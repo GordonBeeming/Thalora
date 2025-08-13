@@ -1,3 +1,29 @@
+/* Define root variables for colors and spacing.
+  This uses your preferred color palette and sets up some sensible defaults.
+*/
+:root {
+  /* Color Palette */
+  --background: #F8F9FA;
+  --text: #1A1A1A;
+  --primary: #003353;
+  --accent: #46CBFF;
+  --ui-accent: #E9ECEF;
+  --text-muted: #6c757d;
+  --error: #e74c3c;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+
+  /* Transitions & Shadows */
+  --transition-normal: 0.2s;
+  --ease-in-out: ease-in-out;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
 .url-form {
   width: 100%;
   max-width: 700px;
@@ -13,7 +39,7 @@
 .url-form__input-group {
   display: flex;
   gap: var(--spacing-sm);
-  align-items: flex-start;
+  align-items: center;
 }
 
 .url-form__input-wrapper {
@@ -21,57 +47,82 @@
   flex: 1;
 }
 
-.url-form__input {
-  flex: 1;
-  font-size: 1.1rem;
-  padding: var(--spacing-md);
-  padding-left: calc(var(--spacing-md) + 2rem);
+.url-form__input-wrapper .url-form__input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 1rem;
+  /* --- THE CHANGE --- */
+  /* Reduced vertical padding from 16px (var(--spacing-md)) to 12px */
+  padding: 12px var(--spacing-md);
+  padding-left: 48px;
+  /* This still overrides the left padding to make room for the icon */
+  border: 2px solid var(--ui-accent);
+  border-radius: 8px;
+  background-color: var(--background);
+  color: var(--text);
   transition: all var(--transition-normal) var(--ease-in-out);
   box-shadow: var(--shadow-sm);
 }
 
-.url-form__input:focus {
+.url-form__input-wrapper .url-form__input:focus {
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
+  border-color: var(--accent);
+  outline: none;
 }
 
-.url-form__input::placeholder {
+.url-form__input-wrapper .url-form__input::placeholder {
   color: var(--text-muted);
   opacity: 0.8;
 }
 
 .url-form__input-icon {
   position: absolute;
-  left: calc(var(--spacing-sm) + 2px);
+  left: var(--spacing-md);
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-muted);
   font-size: 1.2rem;
   pointer-events: none;
   transition: all var(--transition-normal) var(--ease-in-out);
-  z-index: 10;
+  z-index: 1;
 }
 
-.url-form__input:focus ~ .url-form__input-icon {
+.url-form__input:focus~.url-form__input-icon {
   color: var(--primary);
   transform: translateY(-50%) scale(1.1);
+}
+
+.url-form__input.error {
+  border-color: var(--error);
 }
 
 .url-form__button {
   min-width: 160px;
   white-space: nowrap;
   font-size: 1rem;
-  padding: var(--spacing-md) var(--spacing-lg);
+  font-weight: 600;
+  /* --- THE CHANGE --- */
+  /* Reduced vertical padding from 16px (var(--spacing-md)) to 12px */
+  padding: 12px var(--spacing-lg);
   position: relative;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--spacing-xs);
+  box-sizing: border-box;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background-color: var(--primary);
+  color: var(--background);
+  cursor: pointer;
+  transition: all var(--transition-normal) var(--ease-in-out);
 }
 
-.url-form__button-text {
-  transition: opacity var(--transition-normal) var(--ease-in-out);
+.url-form__button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
 }
 
 .url-form__loading-spinner {
@@ -84,10 +135,11 @@
 }
 
 @keyframes spin {
-  0% {
+  from {
     transform: rotate(0deg);
   }
-  100% {
+
+  to {
     transform: rotate(360deg);
   }
 }
@@ -96,10 +148,12 @@
   opacity: 0.7;
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
 }
 
 .url-form__button:disabled:hover {
   transform: none;
+  box-shadow: none;
 }
 
 /* Enhanced Focus States for Accessibility */
@@ -117,51 +171,37 @@
 @media (max-width: 768px) {
   .url-form__input-group {
     flex-direction: column;
+    align-items: stretch;
+    /* Make items full-width in column layout */
     gap: var(--spacing-sm);
   }
-  
+
   .url-form__button {
     min-width: auto;
     width: 100%;
     justify-content: center;
   }
-  
-  .url-form__input {
-    font-size: 1rem;
-    padding: var(--spacing-sm);
-    padding-left: calc(var(--spacing-sm) + 1.8rem);
-  }
 }
 
 @media (max-width: 480px) {
-  .url-form {
-    max-width: 100%;
-  }
-  
   .url-form__input {
-    font-size: 16px; /* Prevents zoom on iOS */
-    padding: var(--spacing-sm);
-    padding-left: calc(var(--spacing-sm) + 1.6rem);
-  }
-  
-  .url-form__input-icon {
-    left: calc(var(--spacing-sm) + 2px);
-    font-size: 1rem;
-  }
-  
-  .url-form__button {
-    padding: var(--spacing-sm) var(--spacing-md);
-    font-size: 0.95rem;
+    font-size: 16px;
+    /* Prevents zoom on iOS */
   }
 }
 
 /* Touch device optimizations */
 @media (hover: none) and (pointer: coarse) {
-  .url-form__input:focus {
-    transform: none; /* Disable transform on touch devices */
+
+  .url-form__input:focus,
+  .url-form__button:hover {
+    transform: none;
+    /* Disable transform on touch devices */
+    box-shadow: var(--shadow-sm);
   }
-  
+
   .url-form__button {
-    min-height: 44px; /* Minimum touch target size */
+    min-height: 44px;
+    /* Minimum touch target size */
   }
 }

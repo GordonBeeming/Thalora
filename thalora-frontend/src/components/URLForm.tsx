@@ -21,7 +21,7 @@ const URLForm: React.FC<URLFormProps> = ({ onSubmit, isLoading }) => {
     }
 
     const normalizedUrl = normalizeURL(url);
-    
+
     if (!validateURL(normalizedUrl)) {
       setError('Please enter a valid HTTPS URL. HTTP URLs are not supported for security reasons.');
       return;
@@ -46,7 +46,7 @@ const URLForm: React.FC<URLFormProps> = ({ onSubmit, isLoading }) => {
             <input
               type="text"
               className={`input url-form__input ${error ? 'error' : ''}`}
-              placeholder="Enter your URL here (e.g., https://google.com)"
+              placeholder="Enter your URL here (e.g., https://gordonbeeming.com)"
               value={url}
               onChange={handleInputChange}
               disabled={isLoading}
