@@ -195,3 +195,20 @@ curl http://localhost:8080/health
 - `SERVER_HOST` - Server bind address (default: 127.0.0.1)
 - `SERVER_PORT` - Server port (default: 8080)
 - `RUST_LOG` - Logging level (default: info)
+- `TEST_MODE` - Enable simplified authentication for development (default: true)
+- `SKIP_DOMAIN_VERIFICATION` - Skip DNS verification for development (default: true)
+
+### Authentication in Development
+
+By default, the backend runs with `TEST_MODE=true` which simplifies authentication:
+
+- **No passkey required**: Users can register with just username and email
+- **Simplified login**: Login with just the username you registered with
+- **Development friendly**: Bypasses WebAuthn/FIDO2 complexity for easier testing
+
+**How to use:**
+1. Navigate to the frontend (http://localhost:3000)
+2. Click "Register" and provide any username and email
+3. For subsequent logins, use the same username (email not required)
+
+> **Production Note**: Set `TEST_MODE=false` in production to enable real passkey authentication.

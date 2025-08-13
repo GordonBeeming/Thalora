@@ -185,23 +185,39 @@ docker-compose -f docker-compose.test.yml up --abort-on-container-exit
 
 **CRITICAL**: After making any changes, always validate the complete user workflow:
 
-1. **URL Shortening Flow**:
-   - Navigate to the frontend application
-   - Register/login using passkey authentication
-   - Create a shortened URL
+1. **Authentication Flow (Development Mode)**:
+   - The application runs in **TEST_MODE=true** by default for simplified development authentication
+   - **Registration**: Navigate to the frontend and register with any username and email (no passkey required)
+   - **Login**: Use the same username from registration (email not required for login)
+   - **Session Management**: Verify login persists across page refreshes
+   - **Logout**: Test logout functionality
+
+2. **URL Shortening Flow**:
+   - After authenticating, create a shortened URL
    - Test the shortened URL redirection
    - Verify custom domain functionality (if configured)
-
-2. **Authentication Flow**:
-   - Test passkey registration
-   - Test passkey login
-   - Verify secure session management
-   - Test logout functionality
 
 3. **Database Operations**:
    - Verify URL storage and retrieval
    - Test user data persistence
    - Confirm analytics tracking (if implemented)
+
+### Development Authentication (TEST_MODE)
+
+The codebase has `TEST_MODE=true` permanently configured for development to simplify testing:
+
+- **No WebAuthn complexity**: Bypasses passkey/FIDO2 authentication entirely
+- **Simple registration**: Just provide username and email
+- **Simple login**: Use the same username for subsequent logins
+- **Full functionality**: All other features work normally (URL shortening, etc.)
+- **Session handling**: Maintains proper session management
+
+**Usage for developers/testers:**
+1. Start the application (frontend + backend + database)
+2. Navigate to `http://localhost:3000`
+3. Click "Register" → Enter any username and email → Submit
+4. For future logins: Click "Login" → Enter the same username → Submit
+5. Proceed with URL shortening and other features normally
 
 ## Project Structure
 

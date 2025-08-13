@@ -36,7 +36,7 @@ GO
 -- Sample data for testing (optional - can be removed in production)
 -- INSERT INTO urls (original_url, shortened_url) VALUES 
 --     ('https://www.example.com', 'abcd1234'),
---     ('https://www.google.com', 'efgh5678');
+--     ('https://www.gordonbeeming.com', 'efgh5678');
 -- GO
 
 PRINT 'ThaloraDB database and urls table created successfully.';
