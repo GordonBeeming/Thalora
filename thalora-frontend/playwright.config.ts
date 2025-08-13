@@ -73,13 +73,13 @@ export default defineConfig({
     {
       command: 'npm start',
       url: 'http://localhost:3000',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: true,
       timeout: 120 * 1000,
     },
     {
       command: 'cd ../backend && TEST_MODE=true SKIP_DOMAIN_VERIFICATION=true cargo run',
       url: 'http://localhost:8080/health',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: true,
       timeout: 300 * 1000,
       env: {
         TEST_MODE: 'true',
