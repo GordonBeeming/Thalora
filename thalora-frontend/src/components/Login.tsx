@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { loginWithPasskey, isWebAuthnSupported } from '../services/auth';
+import React, { useState, useEffect } from 'react';
+import { loginWithPasskey, isWebAuthnSupported, isTestMode } from '../services/auth';
 import './Login.css';
 
 interface LoginProps {
@@ -11,6 +11,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToRegister }) => 
   const [username, setUsername] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const [testMode, setTestMode] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Check if test mode is enabled
+    isTestMode().then(setTestMode);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,7 +26,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToRegister }) => 
       return;
     }
 
-    if (!isWebAuthnSupported()) {
+    // Skip WebAuthn check in test mode
+    if (!testMode && !isWebAuthnSupported()) {
       setError('Passkey authentication is not supported in this browser. Please use a modern browser with WebAuthn support.');
       return;
     }
