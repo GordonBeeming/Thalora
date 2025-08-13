@@ -43,6 +43,37 @@ jobs:
         # Wait for SQL Server to be ready (using updated tool path and certificate trust)
         timeout 60 bash -c 'until docker exec sqlserver-test /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourTestPassword123!" -C -Q "SELECT 1" > /dev/null 2>&1; do sleep 2; done'
 
+    - name: Create test database and tables
+      run: |
+        # Create the test database
+        docker exec sqlserver-test /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourTestPassword123!" -C -Q "
+        IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'ThaloraTestDB')
+        BEGIN
+            CREATE DATABASE ThaloraTestDB;
+            PRINT 'Database ThaloraTestDB created successfully.';
+        END
+        ELSE
+        BEGIN
+            PRINT 'Database ThaloraTestDB already exists.';
+        END"
+        
+        # Create the urls table
+        docker exec sqlserver-test /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourTestPassword123!" -C -d ThaloraTestDB -Q "
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'urls')
+        BEGIN
+            CREATE TABLE urls (
+                id BIGINT IDENTITY(1,1) PRIMARY KEY,
+                original_url NVARCHAR(2048) NOT NULL,
+                shortened_url NVARCHAR(255) NOT NULL UNIQUE,
+                created_at DATETIME2 DEFAULT GETUTCDATE(),
+                updated_at DATETIME2 DEFAULT GETUTCDATE()
+            );
+            
+            CREATE INDEX IX_urls_shortened_url ON urls(shortened_url);
+            CREATE INDEX IX_urls_created_at ON urls(created_at);
+            PRINT 'URLs table created successfully.';
+        END"
+
     - name: Build backend
       working-directory: ./backend
       run: cargo build --release
