@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Login from '../components/Login';
 import Register from '../components/Register';
+import ThemeToggle from '../components/ThemeToggle';
 import { useAuth } from '../utils/AuthContext';
 import './AuthPage.css';
 
@@ -28,6 +29,10 @@ const AuthPage: React.FC = () => {
 
   return (
     <div className="auth-page">
+      <div className="auth-page__theme-toggle">
+        <ThemeToggle />
+      </div>
+      
       <div className="auth-page__background">
         <div className="auth-page__shapes">
           <div className="auth-page__shape auth-page__shape--1"></div>
@@ -37,27 +42,29 @@ const AuthPage: React.FC = () => {
       </div>
       
       <div className="auth-page__content">
-        <div className="auth-page__header">
-          <div className="auth-page__logo">
+        <div className="auth-page__header fade-in">
+          <div className="auth-page__logo scale-in">
             <span className="auth-page__logo-icon">🔗</span>
             <h1 className="auth-page__logo-text">Thalora</h1>
           </div>
-          <p className="auth-page__tagline">
+          <p className="auth-page__tagline slide-in">
             Secure URL shortening with passkey authentication
           </p>
         </div>
 
-        {activeTab === 'login' ? (
-          <Login
-            onLoginSuccess={handleLoginSuccess}
-            onSwitchToRegister={handleSwitchToRegister}
-          />
-        ) : (
-          <Register
-            onRegisterSuccess={handleRegisterSuccess}
-            onSwitchToLogin={handleSwitchToLogin}
-          />
-        )}
+        <div className="fade-in">
+          {activeTab === 'login' ? (
+            <Login
+              onLoginSuccess={handleLoginSuccess}
+              onSwitchToRegister={handleSwitchToRegister}
+            />
+          ) : (
+            <Register
+              onRegisterSuccess={handleRegisterSuccess}
+              onSwitchToLogin={handleSwitchToLogin}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

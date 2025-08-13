@@ -1,5 +1,6 @@
 import React from 'react';
 import { AuthProvider, useAuth } from './utils/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import Home from './pages/Home';
 import AuthPage from './pages/AuthPage';
 import './styles/globals.css';
@@ -9,7 +10,7 @@ const AppContent: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="app-loading">
+      <div className="app-loading fade-in">
         <div className="app-loading__spinner"></div>
         <p className="app-loading__text">Loading...</p>
       </div>
@@ -25,9 +26,11 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ThemeProvider>
   );
 };
 
