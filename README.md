@@ -172,9 +172,21 @@ The backend provides the following endpoints:
 
 Once both applications are running, you can:
 
-1. Open `http://localhost:3000` in your browser
-2. Enter an HTTPS URL (e.g., `https://www.example.com`) 
-3. Click "Shorten URL" to generate a shortened link
-4. Use the shortened link to redirect to the original URL
+1. **Authentication (Development Mode):**
+   The application runs in **TEST_MODE=true** by default for development, which simplifies authentication:
+   
+   - **Registration**: Just provide a username and email (no passkey required)
+   - **Login**: Use the same username you registered with (no passkey required)
+   
+   This bypasses the WebAuthn/FIDO2 passkey authentication for easier development and testing.
+
+2. **URL Shortening:**
+   - Open `http://localhost:3000` in your browser
+   - Register/login using the simplified test mode authentication
+   - Enter an HTTPS URL (e.g., `https://www.example.com`)
+   - Click "Shorten URL" to generate a shortened link
+   - Use the shortened link to redirect to the original URL
 
 > **Note**: Only HTTPS URLs are supported for security reasons. HTTP URLs will be rejected with an error message.
+
+> **Development Note**: Test mode is enabled by default (`TEST_MODE=true` in `.env`) to simplify development. In production, this should be disabled to require actual passkey authentication.
