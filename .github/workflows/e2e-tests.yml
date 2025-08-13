@@ -40,8 +40,8 @@ jobs:
           -p 1433:1433 --name sqlserver-test \
           -d mcr.microsoft.com/mssql/server:2022-latest
         
-        # Wait for SQL Server to be ready
-        timeout 60 bash -c 'until docker exec sqlserver-test /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "YourTestPassword123!" -Q "SELECT 1" > /dev/null 2>&1; do sleep 2; done'
+        # Wait for SQL Server to be ready (using updated tool path and certificate trust)
+        timeout 60 bash -c 'until docker exec sqlserver-test /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourTestPassword123!" -C -Q "SELECT 1" > /dev/null 2>&1; do sleep 2; done'
 
     - name: Build backend
       working-directory: ./backend
