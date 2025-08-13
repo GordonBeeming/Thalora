@@ -19,14 +19,11 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: thalora-frontend/package-lock.json
+        cache: 'pnpm'
+        cache-dependency-path: thalora-frontend/pnpm-lock.yaml
 
     - name: Set up Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
+      uses: dtolnay/rust-toolchain@stable
 
     - name: Install pnpm
       run: npm install -g pnpm
@@ -73,7 +70,10 @@ jobs:
     - name: Start frontend
       working-directory: ./thalora-frontend
       run: |
-        pnpm start &
+        # Install serve to serve the built files
+        npm install -g serve
+        # Start serving the build directory
+        serve -s build -p 3000 &
         echo $! > frontend.pid
         
         # Wait for frontend to be ready
@@ -86,7 +86,7 @@ jobs:
       run: npx playwright test --reporter=html
 
     - name: Upload Playwright Report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: playwright-report
@@ -94,7 +94,7 @@ jobs:
         retention-days: 30
 
     - name: Upload Test Results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: test-results
