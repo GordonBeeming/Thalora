@@ -1,5 +1,4 @@
 /* Define root variables for colors and spacing.
-  This uses your preferred color palette and sets up some sensible defaults.
 */
 :root {
   /* Color Palette */
@@ -16,6 +15,13 @@
   --spacing-sm: 8px;
   --spacing-md: 16px;
   --spacing-lg: 24px;
+
+  /* NEW: Component-specific variables to remove magic numbers */
+  --input-vertical-padding: 12px;
+  --icon-size: 1.2rem;
+  --icon-gap: 12px;
+  /* The space between the icon and the text */
+  --input-icon-padding-left: calc(var(--spacing-md) + var(--icon-size) + var(--icon-gap));
 
   /* Transitions & Shadows */
   --transition-normal: 0.2s;
@@ -51,11 +57,9 @@
   width: 100%;
   box-sizing: border-box;
   font-size: 1rem;
-  /* --- THE CHANGE --- */
-  /* Reduced vertical padding from 16px (var(--spacing-md)) to 12px */
-  padding: 12px var(--spacing-md);
-  padding-left: 48px;
-  /* This still overrides the left padding to make room for the icon */
+  padding: var(--input-vertical-padding) var(--spacing-md);
+  padding-left: var(--input-icon-padding-left);
+  /* Using the new calculated variable */
   border: 2px solid var(--ui-accent);
   border-radius: 8px;
   background-color: var(--background);
@@ -82,7 +86,8 @@
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-muted);
-  font-size: 1.2rem;
+  font-size: var(--icon-size);
+  /* Using the new variable */
   pointer-events: none;
   transition: all var(--transition-normal) var(--ease-in-out);
   z-index: 1;
@@ -102,9 +107,8 @@
   white-space: nowrap;
   font-size: 1rem;
   font-weight: 600;
-  /* --- THE CHANGE --- */
-  /* Reduced vertical padding from 16px (var(--spacing-md)) to 12px */
-  padding: 12px var(--spacing-lg);
+  padding: var(--input-vertical-padding) var(--spacing-lg);
+  /* Using the new variable for height */
   position: relative;
   overflow: hidden;
   display: flex;
@@ -172,7 +176,6 @@
   .url-form__input-group {
     flex-direction: column;
     align-items: stretch;
-    /* Make items full-width in column layout */
     gap: var(--spacing-sm);
   }
 
@@ -186,7 +189,7 @@
 @media (max-width: 480px) {
   .url-form__input {
     font-size: 16px;
-    /* Prevents zoom on iOS */
+    /* Prevents auto-zoom on iOS */
   }
 }
 
@@ -196,12 +199,10 @@
   .url-form__input:focus,
   .url-form__button:hover {
     transform: none;
-    /* Disable transform on touch devices */
     box-shadow: var(--shadow-sm);
   }
 
   .url-form__button {
     min-height: 44px;
-    /* Minimum touch target size */
   }
 }
