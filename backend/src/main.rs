@@ -12,7 +12,7 @@ use url::Url;
 mod auth;
 mod database;
 
-use auth::auth::{login_begin, login_complete, logout, me, register_begin, register_complete};
+use auth::auth::{login_begin, login_complete, logout, me, register_begin, register_complete, test_mode_info};
 use database::{create_connection_pool, DatabaseConfig, DatabasePool, DatabaseService};
 
 // Data structures for request/response
@@ -618,6 +618,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(Logger::default())
             // Public endpoints
             .route("/health", web::get().to(health_check))
+            .route("/test-mode", web::get().to(test_mode_info))
             .route("/shortened-url/{id}", web::get().to(redirect_url))
             // Authentication endpoints
             .service(

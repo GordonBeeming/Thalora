@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  sqlserver-test:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: thalora-sqlserver-test
+    environment:
+      ACCEPT_EULA: Y
+      SA_PASSWORD: YourTestPassword123!
+      MSSQL_PID: Express
+    ports:
+      - "1434:1433"
+    volumes:
+      - sqlserver-test-data:/var/opt/mssql
+    networks:
+      - thalora-test
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourTestPassword123! -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  backend-test:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: thalora-backend-test
+    environment:
+      DATABASE_URL: "Server=sqlserver-test,1433;Database=ThaloraTestDB;User=sa;Password=YourTestPassword123!;TrustServerCertificate=true;"
+      TEST_MODE: "true"
+      SKIP_DOMAIN_VERIFICATION: "true"
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: "8080"
+      ALLOWED_ORIGINS: "http://localhost:3000,http://frontend-test:3000"
+      RUST_LOG: "info"
+    ports:
+      - "8081:8080"
+    depends_on:
+      sqlserver-test:
+        condition: service_healthy
+    networks:
+      - thalora-test
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: thalora-frontend-test
+    environment:
+      REACT_APP_API_URL: "http://backend-test:8080"
+      NODE_ENV: "test"
+    ports:
+      - "3001:3000"
+    depends_on:
+      backend-test:
+        condition: service_healthy
+    networks:
+      - thalora-test
+    volumes:
+      - ./tests/e2e:/app/tests/e2e:ro
+    command: >
+      bash -c "
+        echo 'Waiting for backend to be ready...' &&
+        sleep 10 &&
+        npm run test:e2e:ci
+      "
+
+volumes:
+  sqlserver-test-data:
+
+networks:
+  thalora-test:
+    driver: bridge

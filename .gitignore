@@ -103,3 +103,5 @@ dist
 .Trashes
 ehthumbs.db
 Thumbs.db
+thalora-frontend/playwright-report/
+thalora-frontend/test-results/

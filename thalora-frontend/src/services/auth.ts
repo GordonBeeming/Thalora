@@ -345,14 +345,135 @@ export async function logout(): Promise<void> {
   }
 }
 
-// Register with passkey
-export async function registerWithPasskey(username: string, email: string): Promise<RegisterCompleteResponse> {
-  const beginResponse = await beginRegistration(username, email);
-  return await completeRegistration(beginResponse);
+// Check if test mode is enabled
+export async function isTestMode(): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/test-mode`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const data = await response.json();
+    return data.test_mode === true;
+  } catch (error) {
+    console.error('Failed to check test mode:', error);
+    return false;
+  }
 }
 
-// Login with passkey
-export async function loginWithPasskey(username: string): Promise<LoginCompleteResponse> {
+// Test mode registration - bypasses WebAuthn
+async function testModeRegister(username: string, email: string): Promise<RegisterCompleteResponse> {
+  // Start normal registration flow
+  const beginResponse = await beginRegistration(username, email);
+  
+  // Create fake credential for test mode
+  const fakeCredential = {
+    id: `test-credential-${username}`,
+    raw_id: btoa(`test-credential-${username}`),
+    type: 'public-key',
+    response: {
+      client_data_json: btoa(JSON.stringify({
+        type: 'webauthn.create',
+        challenge: beginResponse.challenge,
+        origin: window.location.origin,
+      })),
+      attestation_object: btoa('fake-attestation-object'),
+    },
+  };
+
+  // Complete registration with fake credential
+  const completionRequest = {
+    user_id: beginResponse.user_id,
+    credential: fakeCredential,
+  };
+
+  const completionResponse = await fetch(`${API_BASE_URL}/auth/register/complete`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify(completionRequest),
+  });
+
+  if (!completionResponse.ok) {
+    const error = await completionResponse.json();
+    throw new Error(error.error || 'Registration completion failed');
+  }
+
+  return completionResponse.json();
+}
+
+// Test mode login - bypasses WebAuthn
+async function testModeLogin(username: string): Promise<LoginCompleteResponse> {
+  // Start normal login flow
   const beginResponse = await beginLogin(username);
-  return await completeLogin(username, beginResponse);
+
+  // Create fake assertion for test mode
+  const fakeCredential = {
+    id: `test-credential-${username}`,
+    raw_id: btoa(`test-credential-${username}`),
+    type: 'public-key',
+    response: {
+      client_data_json: btoa(JSON.stringify({
+        type: 'webauthn.get',
+        challenge: beginResponse.challenge,
+        origin: window.location.origin,
+      })),
+      authenticator_data: btoa('fake-authenticator-data'),
+      signature: btoa('fake-signature'),
+    },
+  };
+
+  // Complete login with fake credential
+  const completionRequest = {
+    username: username,
+    credential: fakeCredential,
+  };
+
+  const completionResponse = await fetch(`${API_BASE_URL}/auth/login/complete`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify(completionRequest),
+  });
+
+  if (!completionResponse.ok) {
+    const error = await completionResponse.json();
+    throw new Error(error.error || 'Login completion failed');
+  }
+
+  return completionResponse.json();
+}
+
+// Register with passkey (or test mode)
+export async function registerWithPasskey(username: string, email: string): Promise<RegisterCompleteResponse> {
+  const testMode = await isTestMode();
+  
+  if (testMode) {
+    console.log('Test mode detected - using simplified registration');
+    return await testModeRegister(username, email);
+  } else {
+    const beginResponse = await beginRegistration(username, email);
+    return await completeRegistration(beginResponse);
+  }
+}
+
+// Login with passkey (or test mode)
+export async function loginWithPasskey(username: string): Promise<LoginCompleteResponse> {
+  const testMode = await isTestMode();
+  
+  if (testMode) {
+    console.log('Test mode detected - using simplified login');
+    return await testModeLogin(username);
+  } else {
+    const beginResponse = await beginLogin(username);
+    return await completeLogin(username, beginResponse);
+  }
 }

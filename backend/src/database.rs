@@ -82,33 +82,10 @@ impl DatabaseConfig {
             });
 
         // Build connection string with appropriate encryption settings
-        let connection_string = if encryption_enabled {
-            // Production: use encryption with certificate trust
-            if !base_connection_string.contains("Encrypt=") {
-                format!(
-                    "{};Encrypt=yes;TrustServerCertificate=true",
-                    base_connection_string
-                )
-            } else {
-                base_connection_string
-            }
-        } else {
-            // Development: disable encryption for compatibility with SQL Server 2022 in Docker
-            if base_connection_string.contains("Encrypt=") {
-                // Replace any existing Encrypt setting
-                let re = regex::Regex::new(r"Encrypt=[^;]*;?").unwrap();
-                let updated = re.replace_all(&base_connection_string, "");
-                format!(
-                    "{};Encrypt=no;TrustServerCertificate=yes",
-                    updated.trim_end_matches(';')
-                )
-            } else {
-                format!(
-                    "{};Encrypt=no;TrustServerCertificate=yes",
-                    base_connection_string
-                )
-            }
-        };
+        let connection_string = Self::build_connection_string_with_encryption(
+            &base_connection_string,
+            encryption_enabled,
+        );
 
         info!("Database encryption enabled: {}", encryption_enabled);
         if !encryption_enabled {
@@ -138,6 +115,62 @@ impl DatabaseConfig {
             }
         }
         Err(anyhow::anyhow!("No Database parameter found in connection string. Connection string must include Database=<database_name>"))
+    }
+
+    fn build_connection_string_with_encryption(
+        base_connection_string: &str,
+        encryption_enabled: bool,
+    ) -> String {
+        // Parse the connection string into key-value pairs
+        let mut params: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        
+        for part in base_connection_string.split(';') {
+            let part = part.trim();
+            if part.is_empty() {
+                continue;
+            }
+            
+            if let Some((key, value)) = part.split_once('=') {
+                let key = key.trim().to_lowercase();
+                let value = value.trim().to_string();
+                if !key.is_empty() && !value.is_empty() {
+                    params.insert(key, value);
+                }
+            }
+        }
+
+        // Set encryption parameters based on the flag
+        if encryption_enabled {
+            // Production: use encryption with certificate trust
+            params.insert("encrypt".to_string(), "yes".to_string());
+            params.insert("trustservercertificate".to_string(), "true".to_string());
+        } else {
+            // Development: disable encryption for compatibility with SQL Server 2022 in Docker
+            params.insert("encrypt".to_string(), "no".to_string());
+            params.insert("trustservercertificate".to_string(), "yes".to_string());
+        }
+
+        // Rebuild the connection string
+        let mut parts: Vec<String> = params.into_iter()
+            .map(|(key, value)| {
+                // Restore original casing for common parameters
+                let key = match key.as_str() {
+                    "server" => "Server",
+                    "database" => "Database",
+                    "user" => "User",
+                    "password" => "Password",
+                    "encrypt" => "Encrypt",
+                    "trustservercertificate" => "TrustServerCertificate",
+                    _ => &key,
+                };
+                format!("{}={}", key, value)
+            })
+            .collect();
+        
+        // Sort to ensure consistent ordering (important for testing)
+        parts.sort();
+        
+        parts.join(";")
     }
 }
 

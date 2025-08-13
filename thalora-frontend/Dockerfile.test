@@ -1,0 +1,44 @@
+# Multi-stage Dockerfile for testing
+FROM node:18-alpine AS test
+
+# Install dependencies for Playwright
+RUN apk add --no-cache \
+    chromium \
+    firefox \
+    webkit2gtk \
+    curl \
+    bash
+
+# Set up Playwright
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY pnpm-lock.yaml* ./
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Install dependencies
+RUN pnpm install
+
+# Copy source code
+COPY . .
+
+# Install Playwright browsers
+RUN npx playwright install chromium firefox webkit --with-deps
+
+# Add test script for CI
+RUN echo '#!/bin/bash\nset -e\nnpx playwright test --reporter=html --output-dir=test-results' > /app/run-tests.sh && chmod +x /app/run-tests.sh
+
+# Build the application
+RUN pnpm run build
+
+# Expose port
+EXPOSE 3000
+
+# Default command for development
+CMD ["pnpm", "start"]

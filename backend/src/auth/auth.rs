@@ -40,6 +40,14 @@ impl From<anyhow::Error> for AuthError {
 pub struct AuthService;
 
 impl AuthService {
+    // Check if test mode is enabled
+    pub fn is_test_mode() -> bool {
+        std::env::var("TEST_MODE")
+            .unwrap_or_else(|_| "false".to_string())
+            .to_lowercase()
+            == "true"
+    }
+
     // Generate a cryptographic challenge for WebAuthn
     pub fn generate_challenge() -> Vec<u8> {
         let mut rng = rand::thread_rng();
@@ -349,48 +357,56 @@ pub async fn register_complete(
         })));
     }
 
-    // Validate credential
-    let expected_origin = std::env::var("WEBAUTHN_ORIGIN").unwrap_or_else(|_| "http://localhost:3000".to_string());
-    match AuthService::validate_registration_credential(&req.credential, stored_challenge, &expected_origin).await {
-        Ok((credential_id, public_key)) => {
-            // Store user in database
-            match DatabaseService::create_user(
-                &db_pool,
-                username,
-                email,
-                &public_key,
-                &credential_id,
-                0, // Initial counter
-            ).await {
-                Ok(user_id) => {
-                    // Clear registration data from session
-                    session.remove("registration_data");
-
-                    // Set user session
-                    if let Err(e) = session.insert("user_id", user_id) {
-                        warn!("Failed to set user session: {}", e);
-                    }
-
-                    info!("User registered successfully: {} (ID: {})", username, user_id);
-
-                    Ok(HttpResponse::Ok().json(RegisterCompleteResponse {
-                        user_id,
-                        username: username.to_string(),
-                        email: email.to_string(),
-                    }))
-                }
-                Err(e) => {
-                    error!("Failed to create user: {}", e);
-                    Ok(HttpResponse::InternalServerError().json(serde_json::json!({
-                        "error": "Failed to create user"
-                    })))
-                }
+    // Validate credential (or skip in test mode)
+    let (credential_id, public_key) = if AuthService::is_test_mode() {
+        info!("Test mode enabled - bypassing credential validation");
+        // Generate fake credential data for test mode
+        let fake_credential_id = format!("test-credential-{}", username).into_bytes();
+        let fake_public_key = vec![0u8; 65]; // Fake 65-byte public key
+        (fake_credential_id, fake_public_key)
+    } else {
+        let expected_origin = std::env::var("WEBAUTHN_ORIGIN").unwrap_or_else(|_| "http://localhost:3000".to_string());
+        match AuthService::validate_registration_credential(&req.credential, stored_challenge, &expected_origin).await {
+            Ok((credential_id, public_key)) => (credential_id, public_key),
+            Err(e) => {
+                error!("Credential validation failed: {}", e);
+                return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+                    "error": "Invalid credential"
+                })));
             }
         }
+    };
+
+    // Store user in database
+    match DatabaseService::create_user(
+        &db_pool,
+        username,
+        email,
+        &public_key,
+        &credential_id,
+        0, // Initial counter
+    ).await {
+        Ok(user_id) => {
+            // Clear registration data from session
+            session.remove("registration_data");
+
+            // Set user session
+            if let Err(e) = session.insert("user_id", user_id) {
+                warn!("Failed to set user session: {}", e);
+            }
+
+            info!("User registered successfully: {} (ID: {})", username, user_id);
+
+            Ok(HttpResponse::Ok().json(RegisterCompleteResponse {
+                user_id,
+                username: username.to_string(),
+                email: email.to_string(),
+            }))
+        }
         Err(e) => {
-            error!("Credential validation failed: {}", e);
-            Ok(HttpResponse::BadRequest().json(serde_json::json!({
-                "error": "Invalid credential"
+            error!("Failed to create user: {}", e);
+            Ok(HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to create user"
             })))
         }
     }
@@ -515,44 +531,49 @@ pub async fn login_complete(
         }
     };
 
-    // Validate credential
-    let expected_origin = std::env::var("WEBAUTHN_ORIGIN").unwrap_or_else(|_| "http://localhost:3000".to_string());
-    match AuthService::validate_authentication_credential(
-        &req.credential,
-        stored_challenge,
-        &expected_origin,
-        &user.passkey_public_key,
-        user.passkey_counter,
-    ).await {
-        Ok(new_counter) => {
-            // Update counter in database
-            if let Err(e) = DatabaseService::update_user_counter(&db_pool, user.id, new_counter).await {
-                warn!("Failed to update user counter: {}", e);
+    // Validate credential (or skip in test mode)
+    let new_counter = if AuthService::is_test_mode() {
+        info!("Test mode enabled - bypassing authentication credential validation");
+        user.passkey_counter + 1 // Just increment counter in test mode
+    } else {
+        let expected_origin = std::env::var("WEBAUTHN_ORIGIN").unwrap_or_else(|_| "http://localhost:3000".to_string());
+        match AuthService::validate_authentication_credential(
+            &req.credential,
+            stored_challenge,
+            &expected_origin,
+            &user.passkey_public_key,
+            user.passkey_counter,
+        ).await {
+            Ok(new_counter) => new_counter,
+            Err(e) => {
+                error!("Authentication failed: {}", e);
+                return Ok(HttpResponse::Unauthorized().json(serde_json::json!({
+                    "error": "Authentication failed"
+                })));
             }
-
-            // Clear login data from session
-            session.remove("login_data");
-
-            // Set user session
-            if let Err(e) = session.insert("user_id", user.id) {
-                warn!("Failed to set user session: {}", e);
-            }
-
-            info!("User logged in successfully: {} (ID: {})", user.username, user.id);
-
-            Ok(HttpResponse::Ok().json(LoginCompleteResponse {
-                user_id: user.id,
-                username: user.username,
-                email: user.email,
-            }))
         }
-        Err(e) => {
-            error!("Authentication failed: {}", e);
-            Ok(HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": "Authentication failed"
-            })))
-        }
+    };
+
+    // Update counter in database
+    if let Err(e) = DatabaseService::update_user_counter(&db_pool, user.id, new_counter).await {
+        warn!("Failed to update user counter: {}", e);
     }
+
+    // Clear login data from session
+    session.remove("login_data");
+
+    // Set user session
+    if let Err(e) = session.insert("user_id", user.id) {
+        warn!("Failed to set user session: {}", e);
+    }
+
+    info!("User logged in successfully: {} (ID: {})", user.username, user.id);
+
+    Ok(HttpResponse::Ok().json(LoginCompleteResponse {
+        user_id: user.id,
+        username: user.username,
+        email: user.email,
+    }))
 }
 
 pub async fn logout(session: Session) -> Result<HttpResponse> {
@@ -598,4 +619,10 @@ pub async fn me(
             })))
         }
     }
+}
+
+pub async fn test_mode_info() -> Result<HttpResponse> {
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "test_mode": AuthService::is_test_mode()
+    })))
 }
