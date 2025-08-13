@@ -137,7 +137,7 @@ test.describe('UI Components and Responsive Design', () => {
     await expect(page.getByText('Secure URL shortening with passkey')).toBeVisible({ timeout: 10000 });
     
     // Test URL form initial state
-    const urlInput = page.locator('input[placeholder="Enter URL to shorten"]');
+    const urlInput = page.locator('input[placeholder="Enter your URL here (e.g., google.com)"]');
     const shortenButton = page.locator('button:has-text("Shorten URL")');
     
     await expect(urlInput).toBeVisible();
@@ -179,7 +179,7 @@ test.describe('UI Components and Responsive Design', () => {
     await expect(page.getByText('Secure URL shortening with passkey')).toBeVisible({ timeout: 10000 });
     
     // Create shortened URL
-    await page.fill('input[placeholder="Enter URL to shorten"]', testUrl);
+    await page.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', testUrl);
     await page.click('button:has-text("Shorten URL")');
     
     await expect(page.locator('.url-display')).toBeVisible({ timeout: 10000 });

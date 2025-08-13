@@ -31,7 +31,7 @@ test.describe('Complete User Workflow', () => {
     const shortenedUrls = [];
     
     for (const url of testUrls) {
-      await page.fill('input[placeholder="Enter URL to shorten"]', url);
+      await page.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', url);
       await page.click('button:has-text("Shorten URL")');
       
       await expect(page.locator('.url-display')).toBeVisible({ timeout: 10000 });
@@ -50,7 +50,7 @@ test.describe('Complete User Workflow', () => {
       
       // Clear input for next URL
       if (url !== testUrls[testUrls.length - 1]) {
-        await page.locator('input[placeholder="Enter URL to shorten"]').clear();
+        await page.locator('input[placeholder="Enter your URL here (e.g., google.com)"]').clear();
       }
     }
 
@@ -74,7 +74,7 @@ test.describe('Complete User Workflow', () => {
 
     // Step 7: Test the "Test Link" button functionality
     // Go to first URL display (should still be visible)
-    await page.fill('input[placeholder="Enter URL to shorten"]', testUrls[0]);
+    await page.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', testUrls[0]);
     await page.click('button:has-text("Shorten URL")');
     await expect(page.locator('.url-display')).toBeVisible({ timeout: 10000 });
     
@@ -112,7 +112,7 @@ test.describe('Complete User Workflow', () => {
 
     // Step 10: Verify we can still create URLs after re-login
     const postLoginUrl = 'https://www.example.com/post-login-test';
-    await page.fill('input[placeholder="Enter URL to shorten"]', postLoginUrl);
+    await page.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', postLoginUrl);
     await page.click('button:has-text("Shorten URL")');
     
     await expect(page.locator('.url-display')).toBeVisible({ timeout: 10000 });
@@ -163,12 +163,12 @@ test.describe('Complete User Workflow', () => {
     await expect(page2.getByText('Secure URL shortening with passkey')).toBeVisible();
     
     // Create URL in first tab
-    await page1.fill('input[placeholder="Enter URL to shorten"]', 'https://www.example.com/tab1');
+    await page1.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', 'https://www.example.com/tab1');
     await page1.click('button:has-text("Shorten URL")');
     await expect(page1.locator('.url-display')).toBeVisible({ timeout: 10000 });
     
     // Create URL in second tab
-    await page2.fill('input[placeholder="Enter URL to shorten"]', 'https://www.example.com/tab2');
+    await page2.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', 'https://www.example.com/tab2');
     await page2.click('button:has-text("Shorten URL")');
     await expect(page2.locator('.url-display')).toBeVisible({ timeout: 10000 });
     
@@ -207,7 +207,7 @@ test.describe('Complete User Workflow', () => {
     });
     
     // Try to shorten URL - should show error
-    await page.fill('input[placeholder="Enter URL to shorten"]', 'https://www.example.com/error-test');
+    await page.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', 'https://www.example.com/error-test');
     await page.click('button:has-text("Shorten URL")');
     
     // Should show error message

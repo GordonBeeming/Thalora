@@ -65,7 +65,7 @@ test.describe('Error Handling and Edge Cases', () => {
     });
     
     // Try to shorten URL
-    await page.fill('input[placeholder="Enter URL to shorten"]', 'https://www.example.com');
+    await page.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', 'https://www.example.com');
     await page.click('button:has-text("Shorten URL")');
     
     // Should handle authentication error
@@ -88,7 +88,7 @@ test.describe('Error Handling and Edge Cases', () => {
     // Test URL with special characters
     const specialUrl = 'https://www.example.com/test?param=value&other=data#section';
     
-    await page.fill('input[placeholder="Enter URL to shorten"]', specialUrl);
+    await page.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', specialUrl);
     await page.click('button:has-text("Shorten URL")');
     
     await expect(page.locator('.url-display')).toBeVisible({ timeout: 10000 });
@@ -111,7 +111,7 @@ test.describe('Error Handling and Edge Cases', () => {
     // Test URL with unicode characters
     const unicodeUrl = 'https://www.example.com/测试/página';
     
-    await page.fill('input[placeholder="Enter URL to shorten"]', unicodeUrl);
+    await page.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', unicodeUrl);
     await page.click('button:has-text("Shorten URL")');
     
     await expect(page.locator('.url-display')).toBeVisible({ timeout: 10000 });
@@ -138,7 +138,7 @@ test.describe('Error Handling and Edge Cases', () => {
     });
     
     // Fill URL and click multiple times quickly
-    await page.fill('input[placeholder="Enter URL to shorten"]', 'https://www.example.com/concurrent-test');
+    await page.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', 'https://www.example.com/concurrent-test');
     
     // Click button multiple times rapidly
     const shortenButton = page.locator('button:has-text("Shorten URL")');

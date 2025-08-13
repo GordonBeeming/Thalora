@@ -30,7 +30,7 @@ test.describe('URL Shortening', () => {
     const testUrl = 'https://www.example.com/test-page';
     
     // Fill URL form
-    await page.fill('input[placeholder="Enter URL to shorten"]', testUrl);
+    await page.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', testUrl);
     await page.click('button:has-text("Shorten URL")');
     
     // Wait for shortened URL to appear
@@ -54,7 +54,7 @@ test.describe('URL Shortening', () => {
     const testUrl = 'https://www.example.com/copy-test';
     
     // Create shortened URL
-    await page.fill('input[placeholder="Enter URL to shorten"]', testUrl);
+    await page.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', testUrl);
     await page.click('button:has-text("Shorten URL")');
     
     await expect(page.locator('.url-display')).toBeVisible({ timeout: 10000 });
@@ -75,7 +75,7 @@ test.describe('URL Shortening', () => {
     const testUrl = 'https://www.example.com/redirect-test';
     
     // Create shortened URL
-    await page.fill('input[placeholder="Enter URL to shorten"]', testUrl);
+    await page.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', testUrl);
     await page.click('button:has-text("Shorten URL")');
     
     await expect(page.locator('.url-display')).toBeVisible({ timeout: 10000 });
@@ -117,12 +117,12 @@ test.describe('URL Shortening', () => {
     await expect(page.getByText('URL cannot be empty')).toBeVisible();
     
     // Test invalid URL format
-    await page.fill('input[placeholder="Enter URL to shorten"]', 'invalid-url');
+    await page.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', 'invalid-url');
     await page.click('button:has-text("Shorten URL")');
     await expect(page.getByText('Invalid URL format')).toBeVisible();
     
     // Test HTTP URL (should require HTTPS)
-    await page.fill('input[placeholder="Enter URL to shorten"]', 'http://example.com');
+    await page.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', 'http://example.com');
     await page.click('button:has-text("Shorten URL")');
     await expect(page.getByText('Only HTTPS URLs are supported')).toBeVisible();
   });
@@ -138,7 +138,7 @@ test.describe('URL Shortening', () => {
     
     for (let i = 0; i < urls.length; i++) {
       // Create shortened URL
-      await page.fill('input[placeholder="Enter URL to shorten"]', urls[i]);
+      await page.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', urls[i]);
       await page.click('button:has-text("Shorten URL")');
       
       await expect(page.locator('.url-display')).toBeVisible({ timeout: 10000 });
@@ -148,7 +148,7 @@ test.describe('URL Shortening', () => {
       
       // Clear form for next URL (if not the last one)
       if (i < urls.length - 1) {
-        await page.locator('input[placeholder="Enter URL to shorten"]').clear();
+        await page.locator('input[placeholder="Enter your URL here (e.g., google.com)"]').clear();
       }
     }
   });
@@ -161,7 +161,7 @@ test.describe('URL Shortening', () => {
     const longPath = 'very-long-path-'.repeat(100);
     const longUrl = baseUrl + longPath;
     
-    await page.fill('input[placeholder="Enter URL to shorten"]', longUrl);
+    await page.fill('input[placeholder="Enter your URL here (e.g., google.com)"]', longUrl);
     await page.click('button:has-text("Shorten URL")');
     
     // Should still work
