@@ -26,19 +26,17 @@
 }
 
 .home__content {
-  display: grid;
-  grid-template-areas:
-    "tabs"
-    "main-content"
-    "features";
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: var(--spacing-xl);
   max-width: 1200px;
   margin: 0 auto;
+  padding: 0 var(--spacing-md);
 }
 
 /* Tab Navigation */
 .home__tabs {
-  grid-area: tabs;
   display: flex;
   justify-content: center;
   gap: 0.5rem;
@@ -47,7 +45,7 @@
   padding: 0.5rem;
   box-shadow: var(--shadow-md);
   max-width: 600px;
-  margin: 0 auto;
+  width: 100%;
   border: 1px solid var(--border);
   transition: all var(--transition-normal) var(--ease-in-out);
 }
@@ -129,11 +127,11 @@
 }
 
 .home__form-section {
-  grid-area: main-content;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0 var(--spacing-md);
+  width: 100%;
+  max-width: 800px;
 }
 
 .home__form-container {
@@ -185,16 +183,14 @@
 }
 
 .home__info-section {
-  grid-area: features;
-  margin-top: var(--spacing-lg);
+  width: 100%;
 }
 
 .home__domain-section {
-  grid-area: main-content;
   display: flex;
   justify-content: center;
   width: 100%;
-  padding: 0 var(--spacing-md);
+  max-width: 800px;
 }
 
 .loading-spinner {
@@ -236,9 +232,10 @@
 
 .home__features {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: var(--spacing-xl);
   margin-top: var(--spacing-xl);
+  width: 100%;
 }
 
 .home__feature {
@@ -303,21 +300,6 @@
 }
 
 /* Responsive Design */
-@media (min-width: 1024px) {
-  .home__content {
-    grid-template-areas:
-      "tabs"
-      "main-content features";
-    grid-template-columns: 2fr 1fr;
-    align-items: start;
-  }
-  
-  .home__features {
-    grid-template-columns: 1fr;
-    gap: var(--spacing-lg);
-  }
-}
-
 @media (max-width: 768px) {
   .home__main {
     padding: var(--spacing-lg) 0;
@@ -329,7 +311,6 @@
   }
   
   .home__tabs {
-    margin: 0;
     max-width: 100%;
   }
   
@@ -361,11 +342,6 @@
   
   .home__loading {
     padding: var(--spacing-lg);
-  }
-  
-  .home__form-section,
-  .home__domain-section {
-    padding: 0;
   }
 }
 
