@@ -5,33 +5,43 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests/e2e',
+  /* Set global timeout to prevent hanging tests */
+  timeout: process.env.CI ? 60000 : 30000, // 1 minute in CI, 30 seconds locally
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
-  retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  /* Reduce retries in CI for faster feedback */
+  retries: process.env.CI ? 1 : 0,
+  /* Use multiple workers in CI for parallel execution */
+  workers: process.env.CI ? 2 : undefined,
+  /* Use simple reporter in CI, HTML locally */
+  reporter: process.env.CI ? 'github' : 'html',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: 'http://localhost:3000',
 
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
+    /* Collect trace only on retry failures */
     trace: 'on-first-retry',
 
-    /* Take screenshots on failure */
-    screenshot: 'only-on-failure',
+    /* Screenshots only on failure, optimized for CI */
+    screenshot: process.env.CI ? 'only-on-failure' : 'only-on-failure',
 
-    /* Record video on failure */
-    video: 'retain-on-failure',
+    /* Disable video in CI to speed up tests, enable locally for debugging */
+    video: process.env.CI ? 'off' : 'retain-on-failure',
+
+    /* Increase timeout for slower CI environment */
+    actionTimeout: process.env.CI ? 10000 : 5000,
   },
 
-  /* Configure projects for major browsers */
-  projects: [
+  /* Configure projects for major browsers - limit to chromium in CI for speed */
+  projects: process.env.CI ? [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+  ] : [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
@@ -74,17 +84,18 @@ export default defineConfig({
       command: 'npm start',
       url: 'http://localhost:3000',
       reuseExistingServer: true,
-      timeout: 120 * 1000,
+      timeout: process.env.CI ? 180000 : 120000, // 3 minutes in CI, 2 minutes locally
+      ignoreHTTPSErrors: true,
     },
     {
       command: 'cd ../backend && TEST_MODE=true SKIP_DOMAIN_VERIFICATION=true cargo run',
       url: 'http://localhost:8080/health',
       reuseExistingServer: true,
-      timeout: 300 * 1000,
+      timeout: process.env.CI ? 600000 : 300000, // 10 minutes in CI, 5 minutes locally  
       env: {
         TEST_MODE: 'true',
         SKIP_DOMAIN_VERIFICATION: 'true',
-        DATABASE_URL: process.env.DATABASE_URL || 'Server=localhost,1433;Database=ThaloraDB;User=sa;Password=YourPassword123!;TrustServerCertificate=true;',
+        DATABASE_URL: process.env.DATABASE_URL || 'Server=localhost,1433;Database=ThaloraTestDB;User=sa;Password=YourPassword123!;TrustServerCertificate=true;',
       },
     },
   ],

@@ -14,9 +14,11 @@
     "eject": "react-scripts eject",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed",
-    "test:e2e:ci": "playwright test --reporter=html --output-dir=test-results",
+    "test:e2e:headed": "playwright test --headed", 
+    "test:e2e:ci": "CI=true playwright test --reporter=github",
+    "test:e2e:fast": "CI=true playwright test --reporter=line --workers=3",
     "test:e2e:install": "playwright install",
+    "test:e2e:validate": "node ../scripts/validate-playwright-config.js",
     "test:setup": "docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit"
   },
   "eslintConfig": {

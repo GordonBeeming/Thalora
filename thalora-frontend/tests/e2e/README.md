@@ -2,6 +2,39 @@
 
 This directory contains comprehensive end-to-end tests for the Thalora URL shortener using Playwright.
 
+## ⚡ Performance Optimizations
+
+The Playwright configuration has been optimized for fast execution:
+
+- **CI Mode**: Runs only on Chromium (37 tests vs 111 tests)
+- **Parallel Workers**: Uses 2 workers in CI instead of sequential execution  
+- **Video Recording**: Disabled in CI to reduce overhead
+- **Timeouts**: Optimized for CI environment
+- **Reporter**: Uses GitHub reporter in CI for better integration
+
+**Expected Performance:**
+- **Local Development**: ~10-15 minutes (3 browsers)
+- **CI Environment**: ~5-10 minutes (1 browser, optimized)
+- **Performance Improvement**: 66% reduction in CI test count
+
+## 🚀 Quick Start
+
+```bash
+# Install dependencies and browsers
+npm install
+npx playwright install
+
+# Run tests in different modes
+npm run test:e2e              # Standard mode
+npm run test:e2e:ci           # Fast CI mode (single browser)
+npm run test:e2e:ui           # Interactive UI mode
+npm run test:e2e:headed       # Debug mode (visible browser)
+npm run test:e2e:fast         # Ultra-fast mode (3 workers)
+
+# Validate configuration
+npm run test:e2e:validate
+```
+
 ## Features Tested
 
 ### Authentication (Test Mode)
