@@ -25,7 +25,7 @@
   flex: 1;
   font-size: 1.1rem;
   padding: var(--spacing-md);
-  padding-left: calc(var(--spacing-md) + var(--spacing-md) + 1.2rem);
+  padding-left: calc(var(--spacing-md) + 2rem);
   transition: all var(--transition-normal) var(--ease-in-out);
   box-shadow: var(--shadow-sm);
 }
@@ -42,14 +42,14 @@
 
 .url-form__input-icon {
   position: absolute;
-  left: var(--spacing-md);
+  left: calc(var(--spacing-sm) + 2px);
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-muted);
   font-size: 1.2rem;
   pointer-events: none;
   transition: all var(--transition-normal) var(--ease-in-out);
-  z-index: 1;
+  z-index: 10;
 }
 
 .url-form__input:focus ~ .url-form__input-icon {
@@ -128,7 +128,8 @@
   
   .url-form__input {
     font-size: 1rem;
-    padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-sm) calc(var(--spacing-md) + var(--spacing-md) + 1rem);
+    padding: var(--spacing-sm);
+    padding-left: calc(var(--spacing-sm) + 1.8rem);
   }
 }
 
@@ -139,7 +140,8 @@
   
   .url-form__input {
     font-size: 16px; /* Prevents zoom on iOS */
-    padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-sm) calc(var(--spacing-md) + var(--spacing-md) + 1rem);
+    padding: var(--spacing-sm);
+    padding-left: calc(var(--spacing-sm) + 1.6rem);
   }
   
   .url-form__input-icon {
