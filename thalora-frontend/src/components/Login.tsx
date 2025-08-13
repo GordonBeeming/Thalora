@@ -63,18 +63,20 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToRegister }) => 
             <input
               type="text"
               id="username"
-              className="login__input"
+              className={`login__input ${error ? 'error' : ''}`}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Enter your username"
               disabled={isLoading}
               autoComplete="username webauthn"
+              aria-describedby={error ? 'username-error' : undefined}
+              aria-invalid={!!error}
             />
           </div>
 
           {error && (
-            <div className="login__error">
-              <span className="login__error-icon">⚠️</span>
+            <div className="login__error" id="username-error" role="alert">
+              <span className="login__error-icon" aria-hidden="true">⚠️</span>
               {error}
             </div>
           )}
@@ -83,15 +85,16 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToRegister }) => 
             type="submit"
             className="login__submit"
             disabled={isLoading || !username.trim()}
+            aria-label={isLoading ? 'Authenticating with passkey' : 'Sign in with passkey'}
           >
             {isLoading ? (
               <>
-                <div className="login__loading-spinner"></div>
+                <div className="login__loading-spinner" aria-hidden="true"></div>
                 Authenticating...
               </>
             ) : (
               <>
-                <span className="login__submit-icon">🔐</span>
+                <span className="login__submit-icon" aria-hidden="true">🔐</span>
                 Sign in with Passkey
               </>
             )}
@@ -106,6 +109,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToRegister }) => 
               className="login__switch-button"
               onClick={onSwitchToRegister}
               disabled={isLoading}
+              aria-label="Switch to registration form"
             >
               Create one
             </button>
